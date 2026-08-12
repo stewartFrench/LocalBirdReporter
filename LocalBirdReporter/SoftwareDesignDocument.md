@@ -2,7 +2,7 @@
 ## Local Bird Reporter iOS Application
 ## Built in Xcode as "LocalBirdReporter"
 
-**Version:** 1.1
+**Version:** 1.0
 
 **Date:** August 12, 2026
 
