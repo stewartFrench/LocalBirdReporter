@@ -1,0 +1,98 @@
+# Local Bird Reporter - Discover Birds While You Drive
+
+Tired of missing rare birds that were spotted just down the road? Local Bird Reporter is your automatic birding companion that announces nearby bird observations as you travel.
+
+When you run Local Bird Reporter on your iPhone, it automatically checks for recent bird sightings from eBird in your area and announces new birds via text-to-speech. It runs in background and standby at custom intervals (as low as every minute), so you'll never miss interesting birds reported near your current location.
+
+The app is smart about location changes - when you drive more than a configurable distance (e.g., 5 miles), it automatically resets and treats all birds at your new location as "new". Perfect for birding road trips where you're visiting multiple parks or wildlife areas in a day!
+
+Some observations are so exciting you'll want to pull over and try to spot them yourself! The app provides direct links to eBird species pages and maps to the observation locations.
+
+
+-----------------------------------------------
+## Documentation
+
+See [SoftwareDesignDocument.md](LocalBirdReporter/SoftwareDesignDocument.md) for detailed technical documentation including:
+
+- Architecture overview (MVVM pattern)
+- eBird API integration
+- Background operation with location tracking
+- Speech synthesis configuration
+- Location-based reset logic
+- Data persistence strategy
+
+-----------------------------------------------
+## Privacy Policy
+
+**Local Bird Reporter does not collect, store, or share any personal information or user data.**
+
+All settings and bird tracking are stored locally on your device using UserDefaults. No data is transmitted to external servers except for necessary API calls to eBird.org to retrieve bird observations using your provided API key. Location data is used only on-device for calculating distances and querying nearby observations.
+
+**Contact**: stewart.french@gmail.com
+**Last Updated**: 08/12/2026
+
+## Support Information
+
+For any support issues, questions, or feedback, please contact:
+
+**Stewart French**
+Email: stewart.french@gmail.com
+
+-----------------------------------------------
+## Requirements
+
+- iOS 17.0 or later
+- iPhone (iPad supported but optimized for iPhone)
+- Location Services enabled (with "Always Allow" permission for background operation)
+- Internet connection for eBird API access
+- Free eBird API key (obtain from https://ebird.org/api/keygen)
+
+-----------------------------------------------
+## Getting Started
+
+1. **Obtain an eBird API Key**
+   - Visit https://ebird.org/api/keygen
+   - Request a free API key (requires eBird account)
+   - Copy your API key
+
+2. **Configure the App**
+   - Open Settings in the app
+   - Paste your eBird API key
+   - Adjust settings to your preference:
+     - Auto-check interval (default: 5 minutes)
+     - Distance threshold for reset (default: 8 km / 5 miles)
+     - Search radius (default: 2 km / 1.2 miles)
+     - Days back to search (default: 7 days)
+
+3. **Grant Permissions**
+   - Allow location access "While Using App" when first prompted
+   - After enabling auto-check and using in background, iOS will prompt for "Always Allow"
+   - Grant "Always Allow" for best experience with background operation
+
+4. **Start Birding**
+   - Tap "Fetch Local Birds" to see what's nearby
+   - Or enable "Auto Check" in Settings for automatic background operation
+   - Drive to new birding locations and let the app announce new birds!
+
+-----------------------------------------------
+## Copyright and Legal Analysis
+
+All bird observation data displayed in this app is sourced from eBird (www.ebird.org) and is used in accordance with eBird's API Terms of Use. eBird is a project of the Cornell Lab of Ornithology. This app is not affiliated with or endorsed by the Cornell Lab of Ornithology or eBird.
+
+Bird observation data is retrieved via the eBird API v2 and presented with appropriate attribution. Users must obtain their own free API key from eBird to use this application.
+
+-----------------------------------------------
+## License
+
+This software is released into the **public domain**. Anyone is free to copy, modify, publish, use, compile, sell, or distribute this software, either in source code form or as a compiled binary, for any purpose, commercial or non-commercial, and by any means.
+
+No copyright is claimed on this work. Use it freely without restriction.
+
+## Acknowledgments
+
+Developed with assistance from Claude Sonnet 4.5 by Anthropic.
+
+Bird observation data provided by eBird (www.ebird.org), a project of the Cornell Lab of Ornithology.
+
+-----------------------------------------------
+end

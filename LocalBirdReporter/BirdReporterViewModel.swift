@@ -1,0 +1,1173 @@
+//
+//  BirdReporterViewModel.swift
+//  LocalBirdReporter
+//
+//  Created by Stewart French on 8/6/26.
+//
+
+import Foundation
+import CoreLocation
+import AVFoundation
+import UIKit
+
+enum BirdSortMode: String, CaseIterable, Codable
+{
+  case closest      = "Closest to Me"
+  case mostRecent   = "Most Recently Reported"
+  case largestCount = "Largest Number"
+
+} // enum BirdSortMode
+
+// ----------------------------------------
+
+enum DistanceUnit: String, CaseIterable, Codable
+{
+  case kilometers = "Kilometers"
+  case miles      = "Miles"
+
+} // enum DistanceUnit
+
+// ----------------------------------------
+
+@Observable
+class BirdReporterViewModel
+{
+  var locationManager              : LocationManager
+  var birds                        : [BirdObservation] = []
+  var isLoading                    = false
+  var errorMessage                 : String?
+  var distanceMessage              : String?
+  var isSpeaking                   = false
+  var seenBirdIds                  : Set<String> = []
+  var lastKnownLocation            : CLLocation?
+
+  var maxBirdsToDisplay: Int
+  {
+    didSet
+    {
+      UserDefaults.standard.set(
+        maxBirdsToDisplay,
+        forKey: "maxBirdsToDisplay"
+      )
+
+    } // didSet
+
+  } // var maxBirdsToDisplay
+
+  var maxBirdsToSpeak: Int
+  {
+    didSet
+    {
+      UserDefaults.standard.set(
+        maxBirdsToSpeak,
+        forKey: "maxBirdsToSpeak"
+      )
+
+    } // didSet
+
+  } // var maxBirdsToSpeak
+
+  var checkIntervalMinutes: Int
+  {
+    didSet
+    {
+      UserDefaults.standard.set(
+        checkIntervalMinutes,
+        forKey: "checkIntervalMinutes"
+      )
+
+      // If auto-check is running, restart it with new interval
+
+      if isAutoCheckEnabled
+      {
+        startAutoCheck()
+
+      } // if
+
+    } // didSet
+
+  } // var checkIntervalMinutes
+
+  var resetDistanceKm: Int
+  {
+    didSet
+    {
+      UserDefaults.standard.set(
+        resetDistanceKm,
+        forKey: "resetDistanceKm"
+      )
+      
+      // Clear distance message when threshold changes
+      distanceMessage = nil
+
+    } // didSet
+
+  } // var resetDistanceKm
+
+  var searchRadiusKm: Int
+  {
+    didSet
+    {
+      UserDefaults.standard.set(
+        searchRadiusKm,
+        forKey: "searchRadiusKm"
+      )
+
+    } // didSet
+
+  } // var searchRadiusKm
+
+  var daysBack: Int
+  {
+    didSet
+    {
+      UserDefaults.standard.set(
+        daysBack,
+        forKey: "daysBack"
+      )
+
+    } // didSet
+
+  } // var daysBack
+
+  var sortMode: BirdSortMode
+  {
+    didSet
+    {
+      if let encoded = try? JSONEncoder().encode(sortMode)
+      {
+        UserDefaults.standard.set(
+          encoded,
+          forKey: "birdSortMode"
+        )
+
+      } // if
+
+      // Re-sort the existing birds list when sort mode changes
+      // Do NOT trigger speaking, only update display
+
+      if let location = locationManager.location
+      {
+        let allBirds = birds
+        let sortedBirds = sortBirds(
+          allBirds,
+          userLocation: location
+        )
+        birds = sortedBirds
+
+      } // if
+
+    } // didSet
+
+  } // var sortMode
+
+  var distanceUnit: DistanceUnit
+  {
+    didSet
+    {
+      if let encoded = try? JSONEncoder().encode(distanceUnit)
+      {
+        UserDefaults.standard.set(
+          encoded,
+          forKey: "distanceUnit"
+        )
+
+      } // if
+      
+      // Clear distance message when unit changes so it updates on next fetch
+      distanceMessage = nil
+
+    } // didSet
+
+  } // var distanceUnit
+
+  var apiKey: String
+  {
+    didSet
+    {
+      UserDefaults.standard.set(
+        apiKey,
+        forKey: "eBirdAPIKey"
+      )
+
+      birdService.apiKey = apiKey
+
+    } // didSet
+
+  } // var apiKey
+
+  var selectedVoiceIdentifier: String?
+  {
+    didSet
+    {
+      UserDefaults.standard.set(
+        selectedVoiceIdentifier,
+        forKey: "selectedVoiceIdentifier"
+      )
+
+      speech.selectedVoiceIdentifier = selectedVoiceIdentifier
+
+    } // didSet
+
+  } // var selectedVoiceIdentifier
+
+  private var birdService   : eBirdService
+  private var speech        : SpeechService
+  private var timer         : Timer?
+  private var speechEndTask : Task<Void, Never>?
+  var isAutoCheckEnabled    : Bool = false
+  private var audioPlayer   : AVAudioPlayer?
+
+  // ------------------------------
+
+  init()
+  {
+    // Initialize required properties first
+
+    locationManager = LocationManager()
+    birdService = eBirdService()
+    speech = SpeechService()
+
+    maxBirdsToDisplay = UserDefaults.standard.object(
+      forKey: "maxBirdsToDisplay"
+    ) as? Int ?? 50
+
+    maxBirdsToSpeak = UserDefaults.standard.object(
+      forKey: "maxBirdsToSpeak"
+    ) as? Int ?? 7
+
+    checkIntervalMinutes = UserDefaults.standard.object(
+      forKey: "checkIntervalMinutes"
+    ) as? Int ?? 5
+
+    resetDistanceKm = UserDefaults.standard.object(
+      forKey: "resetDistanceKm"
+    ) as? Int ?? 8
+
+    searchRadiusKm = UserDefaults.standard.object(
+      forKey: "searchRadiusKm"
+    ) as? Int ?? 2
+
+    daysBack = UserDefaults.standard.object(
+      forKey: "daysBack"
+    ) as? Int ?? 7
+
+    if let savedSortMode = UserDefaults.standard.data(
+      forKey: "birdSortMode"
+    ),
+       let decoded = try? JSONDecoder().decode(
+         BirdSortMode.self,
+         from: savedSortMode
+       )
+    {
+      sortMode = decoded
+
+    } // if
+    else
+    {
+      sortMode = .closest
+
+    } // else
+
+    if let savedDistanceUnit = UserDefaults.standard.data(
+      forKey: "distanceUnit"
+    ),
+       let decoded = try? JSONDecoder().decode(
+         DistanceUnit.self,
+         from: savedDistanceUnit
+       )
+    {
+      distanceUnit = decoded
+
+    } // if
+    else
+    {
+      distanceUnit = .kilometers
+
+    } // else
+
+    apiKey = UserDefaults.standard.string(
+      forKey: "eBirdAPIKey"
+    ) ?? ""
+
+    birdService.apiKey = apiKey
+
+    selectedVoiceIdentifier = UserDefaults.standard.string(
+      forKey: "selectedVoiceIdentifier"
+    )
+
+    speech.selectedVoiceIdentifier = selectedVoiceIdentifier
+
+    if let savedIds = UserDefaults.standard.array(
+      forKey: "seenBirdIds"
+    ) as? [String]
+    {
+      seenBirdIds = Set(savedIds)
+
+    } // if
+    
+    // Now setup silent audio and notifications
+    
+    setupSilentAudioPlayer()
+    setupNotifications()
+
+    if let savedBirdsData = UserDefaults.standard.data(
+      forKey: "savedBirds"
+    ),
+       let savedBirds = try? JSONDecoder().decode(
+         [BirdObservation].self,
+         from: savedBirdsData
+       )
+    {
+      birds = savedBirds
+
+    } // if
+
+    // Load last known location
+
+    if let latitude = UserDefaults.standard.object(
+      forKey: "lastKnownLatitude"
+    ) as? Double,
+       let longitude = UserDefaults.standard.object(
+         forKey: "lastKnownLongitude"
+       ) as? Double
+    {
+      lastKnownLocation = CLLocation(
+        latitude  : latitude,
+        longitude : longitude
+      )
+
+    } // if
+    
+    // Enable auto-check by default on first launch
+    if UserDefaults.standard.object(forKey: "hasLaunchedBefore") == nil
+    {
+      UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
+      
+      // Start auto-check on first launch
+      DispatchQueue.main.asyncAfter(deadline: .now() + 1.0)
+      {
+        [weak self] in
+        self?.startAutoCheck()
+      }
+    }
+
+  } // init
+
+  // ------------------------------
+
+  func requestLocation()
+  {
+    locationManager.requestLocation()
+
+  } // func requestLocation
+
+  // ------------------------------
+
+  func startAutoCheck()
+  {
+    stopAutoCheck()
+    isAutoCheckEnabled = true
+
+    // Start silent audio to keep app active in background
+
+    startSilentAudio()
+
+    let intervalSeconds = TimeInterval(checkIntervalMinutes * 60)
+
+    timer = Timer.scheduledTimer(
+      withTimeInterval: intervalSeconds,
+      repeats         : true
+    )
+    {
+      [weak self] _ in
+
+      print("Auto-check timer fired at \(Date())")
+      self?.fetchBirds(isAutoCheck: true)
+
+    } // timer
+
+    // Add timer to run loop for background execution
+
+    if let timer = timer
+    {
+      RunLoop.main.add(timer, forMode: .common)
+
+    } // if
+
+    print("Auto-check started, interval: \(checkIntervalMinutes) minutes")
+    print("Silent audio playing: \(audioPlayer?.isPlaying ?? false)")
+
+  } // func startAutoCheck
+
+  // ------------------------------
+
+  func stopAutoCheck()
+  {
+    timer?.invalidate()
+    timer = nil
+    isAutoCheckEnabled = false
+
+    // Stop silent audio when auto-check is stopped
+
+    stopSilentAudio()
+
+  } // func stopAutoCheck
+
+  // ------------------------------
+
+  func stopSpeaking()
+  {
+    speechEndTask?.cancel()
+    speech.stopSpeaking()
+    isSpeaking = false
+
+  } // func stopSpeaking
+
+  // ------------------------------
+
+  func fetchBirds(isAutoCheck: Bool = false)
+  {
+    if apiKey.isEmpty
+    {
+      errorMessage = "Please add your eBird API key in Settings."
+      return
+
+    } // if
+
+    // Always set sort mode to closest when fetching
+
+    sortMode = .closest
+
+    isLoading = true
+    errorMessage = nil
+
+    Task
+    {
+      // Always request fresh location to ensure we have current position
+      
+      await MainActor.run
+      {
+        locationManager.requestLocation()
+
+      } // await MainActor.run
+
+      // Wait for location update (up to 5 seconds)
+      
+      for _ in 0..<10
+      {
+        try? await Task.sleep(nanoseconds: 500_000_000)
+
+        if locationManager.location != nil
+        {
+          break
+
+        } // if
+
+      } // for
+
+      guard let location = locationManager.location else
+      {
+        await MainActor.run
+        {
+          errorMessage = "Location not available. Please check " +
+                         "Settings > Privacy > Location Services " +
+                         "and ensure it's enabled for this app."
+          isLoading = false
+
+        } // await MainActor.run
+
+        return
+
+      } // guard
+
+      // Check if location has changed significantly
+
+      await MainActor.run
+      {
+        print("Current location: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+        print("Reset distance threshold: \(resetDistanceKm) km")
+        
+        if let lastLocation = lastKnownLocation
+        {
+          let distanceInMeters = location.distance(from: lastLocation)
+          let distanceInKm = distanceInMeters / 1000.0
+          let distanceInMiles = distanceInMeters / 1609.34
+
+          print("Last location: \(lastLocation.coordinate.latitude), \(lastLocation.coordinate.longitude)")
+          print("Distance from last location: \(String(format: "%.1f", distanceInKm)) km")
+
+          // Format distance based on user preference
+          let distanceValue = distanceUnit == .miles ? distanceInMiles : distanceInKm
+          let distanceString = String(format: "%.1f", distanceValue)
+          let unitString = distanceUnit == .miles ? "mi" : "km"
+          let thresholdValue = distanceUnit == .miles ? Int(Double(resetDistanceKm) / 1.60934) : resetDistanceKm
+
+          if distanceInKm > Double(resetDistanceKm)
+          {
+            // Significant location change - clear everything and start fresh
+            
+            print("Location changed by \(String(format: "%.1f", distanceInKm)) km - resetting seen birds")
+            distanceMessage = "Moved \(distanceString) \(unitString) - Reset birds"
+            
+            // Clear seen bird IDs
+            seenBirdIds.removeAll()
+            saveSeenBirdIds()
+            
+            // Clear birds list for fresh start
+            birds.removeAll()
+            saveBirds()
+            
+            // Update last known location ONLY when we reset
+            lastKnownLocation = location
+            UserDefaults.standard.set(
+              location.coordinate.latitude,
+              forKey: "lastKnownLatitude"
+            )
+            UserDefaults.standard.set(
+              location.coordinate.longitude,
+              forKey: "lastKnownLongitude"
+            )
+
+          } // if
+          else
+          {
+            print("Distance \(String(format: "%.1f", distanceInKm)) km is less than threshold \(resetDistanceKm) km - NOT resetting")
+            distanceMessage = "Moved \(distanceString) \(unitString) (< \(thresholdValue) \(unitString) threshold)"
+          }
+
+        } // if
+        else
+        {
+          print("No last known location - this is first fetch")
+          distanceMessage = "First location check"
+          
+          // Set initial last known location on first fetch
+          lastKnownLocation = location
+          UserDefaults.standard.set(
+            location.coordinate.latitude,
+            forKey: "lastKnownLatitude"
+          )
+          UserDefaults.standard.set(
+            location.coordinate.longitude,
+            forKey: "lastKnownLongitude"
+          )
+        }
+
+      } // await MainActor.run
+
+      do
+      {
+        let observations = try await birdService.fetchRecentObservations(
+          latitude   : location.coordinate.latitude,
+          longitude  : location.coordinate.longitude,
+          daysBack   : daysBack,
+          maxResults : 100,
+          distanceKm : searchRadiusKm
+        )
+
+        print("Fetched \(observations.count) observations from eBird")
+        for obs in observations.prefix(5)
+        {
+          print("  - \(obs.comName) at \(obs.locName), \(obs.obsDt)")
+        }
+
+        await MainActor.run
+        {
+          var newOrChangedBirds : [BirdObservation] = []
+          var unchangedBirds    : [BirdObservation] = []
+
+          for var observation in observations
+          {
+            // Use location-based ID so same species at different location is "new"
+
+            let locationId = observation.locationBasedId
+
+            if seenBirdIds.contains(locationId)
+            {
+              unchangedBirds.append(observation)
+
+            } // if
+            else
+            {
+              observation.isNew = true
+              newOrChangedBirds.append(observation)
+              seenBirdIds.insert(locationId)
+
+            } // else
+
+          } // for
+
+          let sortedNewBirds = sortBirds(
+            newOrChangedBirds,
+            userLocation: location
+          )
+
+          let sortedExistingBirds = sortBirds(
+            unchangedBirds,
+            userLocation: location
+          )
+
+          let combinedBirds = sortedNewBirds + sortedExistingBirds
+
+          birds = Array(combinedBirds.prefix(maxBirdsToDisplay))
+
+          saveBirds()
+          saveSeenBirdIds()
+
+          // Speech behavior depends on whether this is an auto-check
+          
+          if isAutoCheck
+          {
+            // Auto-check: only speak new birds
+            
+            speakNewBirdsOnly(
+              newOrChangedBirds,
+              userLocation: location
+            )
+
+          } // if
+          else
+          {
+            // Manual fetch: speak new birds first, then fill with closest birds
+            
+            let newBirdsSorted = sortBirds(
+              newOrChangedBirds,
+              userLocation  : location,
+              forceSortMode : .closest
+            )
+            
+            let unchangedBirdsSorted = sortBirds(
+              unchangedBirds,
+              userLocation  : location,
+              forceSortMode : .closest
+            )
+            
+            // Prioritize new birds, then add unchanged birds to fill up to maxBirdsToSpeak
+            let birdsToSpeak = newBirdsSorted + unchangedBirdsSorted
+
+            speakBirdsInOrder(Array(birdsToSpeak.prefix(maxBirdsToSpeak)))
+
+          } // else
+
+          isLoading = false
+
+        } // await MainActor.run
+
+      } // do
+      catch
+      {
+        await MainActor.run
+        {
+          if let urlError = error as? URLError,
+             urlError.code == .badServerResponse
+          {
+            errorMessage = "Invalid API key. Please check your " +
+                           "eBird API key in Settings."
+
+          } // if
+          else
+          {
+            errorMessage = "Failed to fetch birds: " +
+                           "\(error.localizedDescription)"
+
+          } // else
+
+          isLoading = false
+
+        } // await MainActor.run
+
+      } // catch
+
+    } // Task
+
+  } // func fetchBirds
+
+  // ------------------------------
+
+  private func speakBirdsInOrder(
+    _ birds: [BirdObservation]
+  )
+  {
+    guard !birds.isEmpty
+    else
+    {
+      return
+
+    } // guard
+
+    // Check if all birds are new
+    let allBirdsAreNew = birds.allSatisfy { $0.isNew }
+
+    var speechParts: [String] = []
+    
+    // Add "New Birds" prefix if all birds are new
+    if allBirdsAreNew
+    {
+      speechParts.append("New Birds")
+    }
+
+    for bird in birds
+    {
+      var birdText = bird.comName
+
+      if let count = bird.howMany
+      {
+        birdText += ", \(count)"
+
+      } // if
+
+      // Only say "New" if not all birds are new (mixed scenario)
+      if bird.isNew && !allBirdsAreNew
+      {
+        birdText += ", New"
+
+      } // if
+
+      speechParts.append(birdText)
+
+    } // for
+
+    if !speechParts.isEmpty
+    {
+      speechEndTask?.cancel()
+
+      isSpeaking = true
+      let combinedText = speechParts.joined(separator: ",, ")
+      speech.speak(combinedText)
+
+      let estimatedDuration = Double(speechParts.count) * 2.0
+
+      speechEndTask = Task
+      {
+        try? await Task.sleep(
+          nanoseconds: UInt64(estimatedDuration * 1_000_000_000)
+        )
+
+        await MainActor.run
+        {
+          isSpeaking = false
+
+        } // await MainActor.run
+
+      } // speechEndTask
+
+    } // if
+
+  } // func speakBirdsInOrder
+
+  // ------------------------------
+
+  private func speakNewBirdsOnly(
+    _ newBirds: [BirdObservation],
+    userLocation: CLLocation
+  )
+  {
+    // Sort new birds by closest first
+
+    let sortedNewBirds = sortBirds(
+      newBirds,
+      userLocation: userLocation,
+      forceSortMode: .closest
+    )
+
+    let birdsToSpeak = Array(sortedNewBirds.prefix(maxBirdsToSpeak))
+
+    if birdsToSpeak.isEmpty
+    {
+      // No new birds - announce this
+
+      speechEndTask?.cancel()
+
+      isSpeaking = true
+      speech.speak("No new birds")
+
+      speechEndTask = Task
+      {
+        try? await Task.sleep(nanoseconds: 2_000_000_000)
+
+        await MainActor.run
+        {
+          isSpeaking = false
+
+        } // await MainActor.run
+
+      } // speechEndTask
+
+      return
+
+    } // if
+
+    // We have new birds - speak them
+
+    var speechParts: [String] = ["New Birds"]
+
+    for bird in birdsToSpeak
+    {
+      var birdText = bird.comName
+
+      if let count = bird.howMany
+      {
+        birdText += ", \(count)"
+
+      } // if
+
+      speechParts.append(birdText)
+
+    } // for
+
+    speechEndTask?.cancel()
+
+    isSpeaking = true
+    let combinedText = speechParts.joined(separator: ",, ")
+    speech.speak(combinedText)
+
+    let estimatedDuration = Double(speechParts.count) * 2.0
+
+    speechEndTask = Task
+    {
+      try? await Task.sleep(
+        nanoseconds: UInt64(estimatedDuration * 1_000_000_000)
+      )
+
+      await MainActor.run
+      {
+        isSpeaking = false
+
+      } // await MainActor.run
+
+    } // speechEndTask
+
+  } // func speakNewBirdsOnly
+
+  // ------------------------------
+
+  private func saveBirds()
+  {
+    if let encoded = try? JSONEncoder().encode(birds)
+    {
+      UserDefaults.standard.set(
+        encoded,
+        forKey: "savedBirds"
+      )
+
+    } // if
+
+  } // func saveBirds
+
+  // ------------------------------
+
+  private func saveSeenBirdIds()
+  {
+    let idsArray = Array(seenBirdIds)
+
+    UserDefaults.standard.set(
+      idsArray,
+      forKey: "seenBirdIds"
+    )
+
+  } // func saveSeenBirdIds
+
+  // ------------------------------
+
+  private func setupSilentAudioPlayer()
+  {
+    // Create a 1 second silent audio buffer
+
+    let sampleRate = 44100.0
+    let duration   = 1.0
+    let frameCount = UInt32(sampleRate * duration)
+
+    guard let format = AVAudioFormat(
+      standardFormatWithSampleRate: sampleRate,
+      channels: 1
+    ),
+    let buffer = AVAudioPCMBuffer(
+      pcmFormat: format,
+      frameCapacity: frameCount
+    )
+    else
+    {
+      return
+
+    } // guard
+
+    buffer.frameLength = frameCount
+
+    // Fill with silence (zeros)
+
+    if let channelData = buffer.floatChannelData
+    {
+      let data = channelData[0]
+      for i in 0..<Int(frameCount)
+      {
+        data[i] = 0.0
+
+      } // for
+
+    } // if
+
+    // Create temporary file for silent audio
+
+    let tempDir    = FileManager.default.temporaryDirectory
+    let silenceURL = tempDir.appendingPathComponent("silence.caf")
+
+    do
+    {
+      // Write silent audio to file
+
+      let audioFile = try AVAudioFile(
+        forWriting: silenceURL,
+        settings: format.settings
+      )
+      try audioFile.write(from: buffer)
+
+      // Setup audio player with the silent file
+
+      audioPlayer = try AVAudioPlayer(contentsOf: silenceURL)
+      audioPlayer?.numberOfLoops = -1
+      audioPlayer?.volume        = 0.0
+      audioPlayer?.prepareToPlay()
+
+    } // do
+    catch
+    {
+      print("Failed to setup silent audio player: \(error)")
+
+    } // catch
+
+  } // setupSilentAudioPlayer
+
+  // ------------------------------
+
+  private func startSilentAudio()
+  {
+    guard let player = audioPlayer
+    else
+    {
+      return
+
+    } // guard
+
+    // Configure audio session for background playback
+
+    do
+    {
+      let audioSession = AVAudioSession.sharedInstance()
+      try audioSession.setCategory(
+        .playback,
+        mode: .voicePrompt,
+        options: [.mixWithOthers]
+      )
+      try audioSession.setActive(true)
+
+    } // do
+    catch
+    {
+      print("Failed to configure audio session: \(error)")
+
+    } // catch
+
+    if !player.isPlaying
+    {
+      player.play()
+
+      // Verify playback started after a brief delay
+
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.5)
+      {
+        [weak self] in
+        if self?.audioPlayer?.isPlaying == false
+        {
+          // Retry if failed
+
+          self?.audioPlayer?.play()
+
+        } // if
+
+      } // asyncAfter
+
+    } // if
+
+  } // startSilentAudio
+
+  // ------------------------------
+
+  private func stopSilentAudio()
+  {
+    audioPlayer?.stop()
+
+  } // stopSilentAudio
+
+  // ------------------------------
+
+  private func setupNotifications()
+  {
+    // Observe audio session interruptions
+
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handleAudioSessionInterruption),
+      name: AVAudioSession.interruptionNotification,
+      object: AVAudioSession.sharedInstance()
+    )
+
+    // Monitor app lifecycle
+
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(appDidEnterBackground),
+      name: UIApplication.didEnterBackgroundNotification,
+      object: nil
+    )
+
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(appWillEnterForeground),
+      name: UIApplication.willEnterForegroundNotification,
+      object: nil
+    )
+
+  } // setupNotifications
+
+  // ------------------------------
+
+  @objc private func handleAudioSessionInterruption(
+    notification: Notification
+  )
+  {
+    guard let userInfo = notification.userInfo,
+          let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+          let type = AVAudioSession.InterruptionType(rawValue: typeValue)
+    else
+    {
+      return
+
+    } // guard
+
+    if type == .ended
+    {
+      // Interruption ended - restart silent audio if auto-check is enabled
+
+      if isAutoCheckEnabled
+      {
+        do
+        {
+          try AVAudioSession.sharedInstance().setActive(true)
+          startSilentAudio()
+
+        } // do
+        catch
+        {
+          print("Failed to reactivate audio session: \(error)")
+
+        } // catch
+
+      } // if
+
+    } // if
+
+  } // handleAudioSessionInterruption
+
+  // ------------------------------
+
+  @objc private func appDidEnterBackground()
+  {
+    // Ensure silent audio is playing when entering background
+
+    if isAutoCheckEnabled
+    {
+      startSilentAudio()
+
+    } // if
+
+  } // appDidEnterBackground
+
+  // ------------------------------
+
+  @objc private func appWillEnterForeground()
+  {
+    // Verify silent audio is still running
+
+    if isAutoCheckEnabled
+    {
+      if audioPlayer?.isPlaying == false
+      {
+        startSilentAudio()
+
+      } // if
+
+    } // if
+
+  } // appWillEnterForeground
+
+  // ------------------------------
+
+  private func sortBirds(
+    _ birds      : [BirdObservation],
+    userLocation : CLLocation,
+    forceSortMode: BirdSortMode? = nil
+  ) -> [BirdObservation]
+  {
+    let modeToUse = forceSortMode ?? sortMode
+
+    switch modeToUse
+    {
+    case .largestCount:
+      return birds.sorted
+      {
+        first, second in
+
+        let firstCount = first.howMany ?? 0
+        let secondCount = second.howMany ?? 0
+
+        return firstCount > secondCount
+
+      } // return
+
+    case .mostRecent:
+      return birds.sorted
+      {
+        first, second in
+
+        return first.obsDt > second.obsDt
+
+      } // return
+
+    case .closest:
+      return birds.sorted
+      {
+        first, second in
+
+        let firstLocation = CLLocation(
+          latitude : first.lat,
+          longitude: first.lng
+        )
+
+        let secondLocation = CLLocation(
+          latitude : second.lat,
+          longitude: second.lng
+        )
+
+        let firstDistance = userLocation.distance(from: firstLocation)
+        let secondDistance = userLocation.distance(from: secondLocation)
+
+        // If distances are essentially the same (within 1 meter), sort by count
+
+        if abs(firstDistance - secondDistance) < 1.0
+        {
+          let firstCount = first.howMany ?? 0
+          let secondCount = second.howMany ?? 0
+          return firstCount > secondCount
+
+        } // if
+
+        return firstDistance < secondDistance
+
+      } // return
+
+    } // switch
+
+  } // func sortBirds
+
+} // class BirdReporterViewModel
