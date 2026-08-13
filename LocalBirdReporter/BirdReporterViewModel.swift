@@ -238,19 +238,19 @@ class BirdReporterViewModel
 
     checkIntervalMinutes = UserDefaults.standard.object(
       forKey: "checkIntervalMinutes"
-    ) as? Int ?? 5
+    ) as? Int ?? 2
 
     resetDistanceKm = UserDefaults.standard.object(
       forKey: "resetDistanceKm"
-    ) as? Int ?? 8
+    ) as? Int ?? 3
 
     searchRadiusKm = UserDefaults.standard.object(
       forKey: "searchRadiusKm"
-    ) as? Int ?? 2
+    ) as? Int ?? 3
 
     daysBack = UserDefaults.standard.object(
       forKey: "daysBack"
-    ) as? Int ?? 7
+    ) as? Int ?? 1
 
     if let savedSortMode = UserDefaults.standard.data(
       forKey: "birdSortMode"
@@ -323,33 +323,18 @@ class BirdReporterViewModel
 
     } // if
 
-    // Load last known location
-
-    if let latitude = UserDefaults.standard.object(
-      forKey: "lastKnownLatitude"
-    ) as? Double,
-       let longitude = UserDefaults.standard.object(
-         forKey: "lastKnownLongitude"
-       ) as? Double
-    {
-      lastKnownLocation = CLLocation(
-        latitude  : latitude,
-        longitude : longitude
-      )
-
-    } // if
+    // Clear last known location on app launch
+    // This ensures every app launch starts fresh with "First location check"
+    // and prevents GPS drift from showing false movement messages
     
-    // Enable auto-check by default on first launch
+    lastKnownLocation = nil
+    UserDefaults.standard.removeObject(forKey: "lastKnownLatitude")
+    UserDefaults.standard.removeObject(forKey: "lastKnownLongitude")
+    
+    // Mark first launch (but don't enable auto-check by default)
     if UserDefaults.standard.object(forKey: "hasLaunchedBefore") == nil
     {
       UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
-      
-      // Start auto-check on first launch
-      DispatchQueue.main.asyncAfter(deadline: .now() + 1.0)
-      {
-        [weak self] in
-        self?.startAutoCheck()
-      }
     }
 
   } // init
@@ -562,7 +547,7 @@ class BirdReporterViewModel
           latitude   : location.coordinate.latitude,
           longitude  : location.coordinate.longitude,
           daysBack   : daysBack,
-          maxResults : 100,
+          maxResults : maxBirdsToDisplay,
           distanceKm : searchRadiusKm
         )
 

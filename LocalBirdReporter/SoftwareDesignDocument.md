@@ -176,7 +176,7 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 **Logic**:
 
   1. On each fetch, calculate distance from last known location
-  2. If distance > threshold (e.g., 8 km), reset:
+  2. If distance > threshold (e.g., 3 km), reset:
      - Clear `seenBirdIds` set
      - Clear `birds` array
      - Update last known location to current position
@@ -186,9 +186,11 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 
   - `lastKnownLocation: CLLocation?` - Reference point for distance
      calculation
-  - `resetDistanceKm: Int` - Configurable threshold (default 8 km)
+  - `resetDistanceKm: Int` - Configurable threshold (default 3 km)
   - Only updates last known location when reset occurs (not on every
     fetch)
+  - Last known location is cleared on app launch to prevent GPS drift
+    from showing false movement messages
 
 ### 4. Auto-Check
 
@@ -212,7 +214,8 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 - Timer added to `.common` run loop mode for background execution
 - Silent audio keeps app active in background
 - Auto-check speaks only new birds (not all birds)
-- Configurable interval (default 5 minutes)
+- Configurable interval (default 2 minutes)
+- Auto-check is OFF by default (user must enable it)
 
 ---
 
@@ -449,13 +452,13 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 | `maxBirdsToSpeak`
 |     | Int      |    7   | Birds announced        |
 | `checkIntervalMinutes`
-|     | Int      |    5   | Auto-check frequency   |
+|     | Int      |    2   | Auto-check frequency   |
 | `resetDistanceKm`
-|     | Int      |    8   | Distance threshold     |
+|     | Int      |    3   | Distance threshold     |
 | `searchRadiusKm`
-|     | Int      |    2   | eBird search radius    |
+|     | Int      |    3   | eBird search radius    |
 | `daysBack`
-|     | Int      |    7   | How far back to search |
+|     | Int      |    1   | How far back to search |
 | `birdSortMode`
 |     | Codable  | .closest | Sorting preference   |
 | `distanceUnit`

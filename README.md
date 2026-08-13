@@ -63,10 +63,10 @@ Email: stewart.french@gmail.com
    - Paste your eBird API key
    - Adjust settings to your preference:
 
-     - Auto-check interval (default: 5 minutes)
-     - Distance threshold for reset (default: 8 km / 5 miles)
-     - Search radius (default: 2 km / 1.2 miles)
-     - Days back to search (default: 7 days)
+     - Auto-check interval (default: 2 minutes)
+     - Distance threshold for reset (default: 3 km / 1.9 miles)
+     - Search radius (default: 3 km / 1.9 miles)
+     - Days back to search (default: 1 day)
 
 3. **Grant Permissions**
 
