@@ -171,6 +171,11 @@ struct SettingsView: View
             in    : 1...30
           )
 
+          Toggle(
+            "Announce 'No new birds'",
+            isOn: $viewModel.announceNoNewBirds
+          )
+
         } // Section Speech Settings
 
       } // Form

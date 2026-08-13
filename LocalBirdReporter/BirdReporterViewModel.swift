@@ -211,6 +211,19 @@ class BirdReporterViewModel
 
   } // var selectedVoiceIdentifier
 
+  var announceNoNewBirds: Bool
+  {
+    didSet
+    {
+      UserDefaults.standard.set(
+        announceNoNewBirds,
+        forKey: "announceNoNewBirds"
+      )
+
+    } // didSet
+
+  } // var announceNoNewBirds
+
   private var birdService   : eBirdService
   private var speech        : SpeechService
   private var timer         : Timer?
@@ -290,12 +303,15 @@ class BirdReporterViewModel
       forKey: "eBirdAPIKey"
     ) ?? ""
 
-    birdService.apiKey = apiKey
-
     selectedVoiceIdentifier = UserDefaults.standard.string(
       forKey: "selectedVoiceIdentifier"
     )
 
+    announceNoNewBirds = UserDefaults.standard.object(
+      forKey: "announceNoNewBirds"
+    ) as? Bool ?? false
+
+    birdService.apiKey = apiKey
     speech.selectedVoiceIdentifier = selectedVoiceIdentifier
 
     if let savedIds = UserDefaults.standard.array(
@@ -760,24 +776,28 @@ class BirdReporterViewModel
 
     if birdsToSpeak.isEmpty
     {
-      // No new birds - announce this
+      // No new birds - announce this only if enabled
 
-      speechEndTask?.cancel()
-
-      isSpeaking = true
-      speech.speak("No new birds")
-
-      speechEndTask = Task
+      if announceNoNewBirds
       {
-        try? await Task.sleep(nanoseconds: 2_000_000_000)
+        speechEndTask?.cancel()
 
-        await MainActor.run
+        isSpeaking = true
+        speech.speak("No new birds")
+
+        speechEndTask = Task
         {
-          isSpeaking = false
+          try? await Task.sleep(nanoseconds: 2_000_000_000)
 
-        } // await MainActor.run
+          await MainActor.run
+          {
+            isSpeaking = false
 
-      } // speechEndTask
+          } // await MainActor.run
+
+        } // speechEndTask
+
+      } // if announceNoNewBirds
 
       return
 
