@@ -4,7 +4,7 @@ Tired of missing rare birds that were spotted just down the road? Local Bird Rep
 
 When you run Local Bird Reporter on your iPhone, it automatically checks for recent bird sightings from eBird in your area and announces new birds via text-to-speech. It runs in background and standby at custom intervals (as low as every minute), so you'll never miss interesting birds reported near your current location.
 
-The app is smart about location changes - when you drive more than a configurable distance (for example, 5 miles), it automatically resets and treats all birds at your new location as "new". Perfect for birding road trips where you're visiting multiple parks or wildlife areas in a day!
+The app is smart about location changes - when you drive more than a configurable distance (for example, 3 km), it automatically resets and treats all birds at your new location as "new". Perfect for birding road trips where you're visiting multiple parks or wildlife areas in a day!
 
 Some observations are so exciting you'll want to pull over and try to spot them yourself! The app provides direct links to eBird species pages and maps to the observation locations.
 

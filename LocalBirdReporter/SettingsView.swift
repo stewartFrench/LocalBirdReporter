@@ -44,6 +44,39 @@ struct SettingsView: View
         } // Section eBird API
 
         Section(
+          header: Text("Auto Check")
+        )
+        {
+          Stepper(
+            "Check every \(viewModel.checkIntervalMinutes) minutes",
+            value : $viewModel.checkIntervalMinutes,
+            in    : 1...120
+          )
+
+          Toggle(
+            "Enable Auto Check",
+            isOn: $viewModel.isAutoCheckEnabled
+          )
+          .onChange(
+            of: viewModel.isAutoCheckEnabled
+          )
+          { oldValue, newValue in
+            if newValue
+            {
+              viewModel.startAutoCheck()
+
+            } // if
+            else
+            {
+              viewModel.stopAutoCheck()
+
+            } // else
+
+          } // onChange
+
+        } // Section Auto Check
+
+        Section(
           header: Text("Display Settings")
         )
         {
@@ -139,39 +172,6 @@ struct SettingsView: View
           )
 
         } // Section Speech Settings
-
-        Section(
-          header: Text("Auto Check")
-        )
-        {
-          Stepper(
-            "Check every \(viewModel.checkIntervalMinutes) minutes",
-            value : $viewModel.checkIntervalMinutes,
-            in    : 1...120
-          )
-
-          Toggle(
-            "Enable Auto Check",
-            isOn: $viewModel.isAutoCheckEnabled
-          )
-          .onChange(
-            of: viewModel.isAutoCheckEnabled
-          )
-          { oldValue, newValue in
-            if newValue
-            {
-              viewModel.startAutoCheck()
-
-            } // if
-            else
-            {
-              viewModel.stopAutoCheck()
-
-            } // else
-
-          } // onChange
-
-        } // Section Auto Check
 
       } // Form
       .navigationTitle("Settings")
