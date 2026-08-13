@@ -74,6 +74,11 @@ struct SettingsView: View
 
           } // onChange
 
+          Toggle(
+            "Announce 'No new birds'",
+            isOn: $viewModel.announceNoNewBirds
+          )
+
         } // Section Auto Check
 
         Section(
@@ -169,11 +174,6 @@ struct SettingsView: View
             "Speak: \(viewModel.maxBirdsToSpeak) birds",
             value : $viewModel.maxBirdsToSpeak,
             in    : 1...30
-          )
-
-          Toggle(
-            "Announce 'No new birds'",
-            isOn: $viewModel.announceNoNewBirds
           )
 
         } // Section Speech Settings
