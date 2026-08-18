@@ -710,20 +710,23 @@ class BirdReporterViewModel
 
     for bird in birds
     {
-      var birdText = bird.comName
-
-      if let count = bird.howMany
-      {
-        birdText += ", \(count)"
-
-      } // if
+      var birdText = ""
 
       // Only say "New" if not all birds are new (mixed scenario)
       if bird.isNew && !allBirdsAreNew
       {
-        birdText += ", New"
+        birdText = "New, "
 
       } // if
+
+      // Add count before bird name if available
+      if let count = bird.howMany
+      {
+        birdText += "\(count) "
+
+      } // if
+
+      birdText += bird.comName
 
       speechParts.append(birdText)
 
@@ -809,13 +812,16 @@ class BirdReporterViewModel
 
     for bird in birdsToSpeak
     {
-      var birdText = bird.comName
+      var birdText = ""
 
+      // Add count before bird name if available
       if let count = bird.howMany
       {
-        birdText += ", \(count)"
+        birdText = "\(count) "
 
       } // if
+
+      birdText += bird.comName
 
       speechParts.append(birdText)
 
