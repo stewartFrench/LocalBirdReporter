@@ -4,7 +4,7 @@
 
 **Version:** 1.0
 
-**Date:** August 12, 2026
+**Date:** August 25, 2026
 
 **Author:** Stewart French, Claude Sonnet 4.5 by Anthropic
 
@@ -37,7 +37,12 @@ and maintains awareness of location changes.
 ### Key Capabilities
 
   - Fetch recent bird observations from eBird API based on current GPS
-    location
+    location or manually selected location
+    
+  - Manually select and pin locations (e.g., wildlife refuges) for
+    remote monitoring
+    
+  - Interactive map with satellite view for location selection
     
   - Automatically check for new birds at configurable intervals
 
@@ -46,7 +51,7 @@ and maintains awareness of location changes.
   - Track which birds have been "seen" and identify new observations
 
   - Reset bird list when moving beyond a configurable distance
-    threshold
+    threshold (GPS mode only)
 
   - Operate in background with location updates and speech
     announcements
@@ -66,12 +71,13 @@ and maintains awareness of location changes.
 The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 
 ```
-┌─────────────────┐
-│     Views       │  SwiftUI Views
-│  ContentView    │  - Main bird list
-│  SettingsView   │  - Configuration UI
-│  AbouteBirdView │  - Information screen
-└────────┬────────┘
+┌─────────────────────┐
+│     Views           │  SwiftUI Views
+│  ContentView        │  - Main bird list
+│  SettingsView       │  - Configuration UI
+│  ChangeLocationView │  - Map-based location picker
+│  AbouteBirdView     │  - Information screen
+└────────┬────────────┘
          │
          ▼
 ┌─────────────────────────────┐
@@ -251,11 +257,14 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 ```swift
   enum BirdSortMode: String, CaseIterable, Codable 
   {
-    case closest      = "Closest to Me"
+    case closest      = "Closest"
     case mostRecent   = "Most Recently Reported"
     case largestCount = "Largest Number"
   }
 ```
+
+**Note**: Default sort mode is "Largest Number" and persists between app
+          restarts.
 
 ### DistanceUnit
 ```swift
@@ -338,8 +347,10 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 **Features**:
 
   - Configurable voice selection (English voices)
+  - Duplicate voice names filtered out
   - Mixing with background audio (silent audio)
   - AVSpeechSynthesizer for speech synthesis
+  - Optional "No new birds" announcement
 
 **Configuration**:
 
@@ -357,6 +368,7 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
   func speak(_ text: String)
   func stopSpeaking()
   static func getAvailableVoices() -> [AVSpeechSynthesisVoice]
+  // Returns deduplicated list of English voices
 ```
 
 **Speech Patterns**:
@@ -376,8 +388,9 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
   1. **Header**
 
      - App title: "Local Bird Reporter"
-     - "Supported by eBird" link (opens AbouteBirdView)
+     - "Powered by eBird" link (opens AbouteBirdView)
      - Settings gear icon (top-right)
+     - Manual location name display (if set, in orange)
      - Sort mode display: "Sorted by: [mode]"
   
   2. **Status Area**
@@ -390,6 +403,8 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
   3. **Bird List**
 
      - Scrollable list of observations
+     - Automatically scrolls to top after each fetch
+     - Automatically scrolls to top when sort mode changes
      - New birds shown first with 🆕 badge
      - Tappable bird name → opens eBird species page
      - Tappable location → opens Apple Maps
@@ -403,31 +418,87 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 
 ### SettingsView
 
-**Organized into sections**:
+**Organized into sections** (most-used items at top):
 
-  1. **eBird API**
+  1. **Search & Display**
+  
+     - Display: X birds (stepper, 1-50)
+     - Show birds from last: X days (stepper, 1-30)
+     - Search radius: X km/mi (stepper, 1-50)
+     - Sort by (picker: Closest/Most Recent/Largest Count)
+
+  2. **Location**
+  
+     - Change Location button (opens ChangeLocationView)
+     - Location status display:
+       - "Currently: [location name]" (if manual location set)
+       - "Using manual location" (if set but no name)
+       - "Using current GPS location" (if GPS mode)
+  
+  3. **Auto Check**
+  
+     - Check every X minutes (stepper, 1-120)
+     - Enable Auto Check (toggle)
+     - Announce "No new birds" (toggle)
+  
+  4. **Speech**
+  
+     - Speak: X birds (stepper, 0-30, 0=off)
+  
+  5. **Voice**
+  
+     - Voice (picker of deduplicated English voices)
+  
+  6. **Distance Units**
+  
+     - Distance units (picker: Kilometers/Miles)
+     - Mark all birds New after moving: X km/mi (stepper, 1-100)
+
+  7. **eBird API**
 
      - Secure field for API key
      - Link to obtain API key
 
-  2. **Display Settings**
+### ChangeLocationView
+
+**Map-Based Location Picker**:
+
+  1. **Search Field**
   
-     - Display: X birds (stepper, 1-50)
-     - Sort by (picker: Closest/Most Recent/Largest Count)
-     - Distance units (picker: Kilometers/Miles)
-     - Mark all birds New after moving: X km/mi
-     - Search radius: X km/mi
-     - Show birds from last: X days
+     - Displays current location name on open
+     - Live search with MKLocalSearchCompleter
+     - Clear button (x) with auto-focus
+     - Magnifying glass icon to trigger search
+     - Current location icon (arrow pointing up-right)
   
-  3. **Speech Settings**
+  2. **Small Map View**
   
-     - Voice (picker of available English voices)
-     - Speak: X birds (stepper, 1-30)
+     - Preview map showing selected location
+     - Pin annotation at selected coordinate
+     - Map type toggle (standard/satellite hybrid)
+     - Tap to open full-screen map
+     - iOS 26 MapKit APIs (MKReverseGeocodingRequest)
   
-  4. **Auto Check**
+  3. **Full-Screen Map**
   
-     - Check every X minutes (stepper, 1-120)
-     - Enable Auto Check (toggle)
+     - Interactive map with pan and zoom
+     - Tap anywhere to select location
+     - Map type toggle button
+     - Close button (x) in top-right corner
+     - Immediately sets manual location on selection
+  
+  4. **Workflow**
+  
+     - Selecting location immediately sets it (no "Go There" button)
+     - "Done" button dismisses view
+     - Current location icon clears manual location and returns to GPS mode
+     - Dismissing returns to Settings or main view
+  
+  5. **Location Modes**
+  
+     - **GPS Mode**: Uses current device location, updates with movement
+     - **Manual Mode**: Fixed location, ignores device movement
+     - Distance-based reset only applies in GPS mode
 
 ### AbouteBirdView
 
@@ -460,7 +531,7 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 | `daysBack`
 |     | Int      |    1   | How far back to search |
 | `birdSortMode`
-|     | Codable  | .closest | Sorting preference   |
+|     | Codable  | .largestCount | Sorting preference   |
 | `distanceUnit`
 |     | Codable  | .kilometers | Display units     |
 | `selectedVoiceIdentifier`
@@ -475,6 +546,17 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 |     | Double?  |   nil  | Last reset location    |
 | `hasLaunchedBefore`
 |     | Bool     |  false | First launch flag      |
+| `manualLocationLatitude`
+|     | Double?  |   nil  | Manual location coord  |
+| `manualLocationLongitude`
+|     | Double?  |   nil  | Manual location coord  |
+| `manualLocationName`
+|     | String?  |   nil  | Manual location name   |
+| `isUsingManualLocation`
+|     | Bool     |  false | Manual location flag   |
+| `announceNoNewBirds`
+|     | Bool     |  false | Speak "No new birds"   |
+|-----|----------|--------|------------------------|
 
 ### Computed Conversions
 
@@ -555,23 +637,33 @@ Uses audio background mode with silent audio to maintain execution:
 
 ### Location Update Strategy
 
-1. **On Fetch**:
+1. **Location Source Selection**:
 
-   - Always request fresh location: `requestLocation()`
+   - If manual location set: Use fixed coordinates (ignore GPS)
+   - If GPS mode: Request fresh location via `requestLocation()`
    - Wait up to 5 seconds for GPS fix
    - Use `startUpdatingLocation()` for continuous updates
 
-2. **Distance Calculation**:
+2. **Distance Calculation** (GPS mode only):
 
 ```swift
   let distanceInMeters = location.distance(from: lastLocation)
   let distanceInKm = distanceInMeters / 1000.0
 ```
 
-3. **Reset Logic**:
+3. **Reset Logic** (GPS mode only):
 
    - Only update `lastKnownLocation` when threshold exceeded
    - Prevents incremental drift (small movements don't update reference)
+   - Manual location mode: No distance tracking or reset
+
+4. **Manual Location Features**:
+
+   - Pin specific location (e.g., wildlife refuge)
+   - Monitor remote location from anywhere
+   - Interactive map with search and tap-to-select
+   - Standard and satellite/hybrid map views
+   - Reverse geocoding for location names
 
 ---
 
@@ -768,25 +860,27 @@ Uses AVFoundation's AVSpeechSynthesizer
 **2. Speech Prioritization (Manual Fetch)**
 
 ```swift
-  // Speak new birds first, then fill with closest birds
+  // Speak new birds first, then unchanged birds
+  // Both use the user's selected sort mode (not forced to closest)
 
   let newBirdsSorted = 
     sortBirds(
         newOrChangedBirds, 
-         userLocation: location, 
-        forceSortMode: .closest )
+         userLocation: location )
 
   let unchangedBirdsSorted = 
     sortBirds(
         unchangedBirds, 
-         userLocation: location, 
-        forceSortMode: .closest )
+         userLocation: location )
 
   let birdsToSpeak = newBirdsSorted + unchangedBirdsSorted
 
   speakBirdsInOrder( 
       Array( birdsToSpeak.prefix( maxBirdsToSpeak ) ) )
 ```
+
+**Note**: Speech and display now use the same sort order (user's selected
+          preference), ensuring consistency.
 
 ### Performance Considerations
 
@@ -839,8 +933,56 @@ Uses AVFoundation's AVSpeechSynthesizer
      - Fetch button disabled while speaking
      - Prevents queuing multiple fetches
      - Clear visual feedback (grayed button)
+  
+  6. **Manual Location Mode**:
+  
+     - No distance tracking when manual location set
+     - Location persists across app launches
+     - Can monitor remote locations from anywhere
+     - Clear visual indicator (orange text on main view)
 
 ---
+
+## Recent Updates (August 2026)
+
+  1. **Manual Location Selection**:
+
+     - Map-based location picker with search
+     - Satellite/hybrid map view toggle
+     - Remote location monitoring
+     - Reverse geocoding for location names
+  
+  2. **iOS 26 Compatibility**:
+
+     - Updated to MKReverseGeocodingRequest (deprecated CLGeocoder)
+     - Uses MKAddressRepresentations for location names
+     - Removed deprecated placemark API usage
+  
+  3. **UI Improvements**:
+
+     - Settings reorganized (most-used items at top)
+     - Scroll-to-top after fetch and sort changes
+     - Manual location name display on main view
+     - Editable search field with clear button
+     - Map type toggle on both small and full-screen maps
+  
+  4. **Speech Enhancements**:
+
+     - Deduplicated voice list (no duplicate names)
+     - Optional "No new birds" announcement
+     - Speech can be disabled (set to 0)
+     - Speech and display use same sort order
+  
+  5. **Sort Mode Updates**:
+
+     - Default changed to "Largest Number"
+     - "Closest to Me" renamed to "Closest"
+     - Sort mode persists between app restarts
+     - Triggers automatic scroll-to-top on change
+  
+  6. **Text Updates**:
+
+     - "Supported by eBird" changed to "Powered by eBird"
 
 ## Future Enhancement Opportunities
 
@@ -859,26 +1001,30 @@ Uses AVFoundation's AVSpeechSynthesizer
      - Log all birds seen with timestamps
      - Export to CSV or share
   
-  4. **Maps Integration**:
+  4. **Enhanced Maps**:
 
-     - Show bird observations on map view
+     - Show bird observations as pins on map
      - Cluster markers for dense areas
+     - Trail/hotspot overlays
   
   5. **Photos & Media**:
 
      - Display bird photos from eBird
      - Link to Macaulay Library
+     - Bird calls and songs
   
   6. **Social Features**:
 
      - Share recent observations
      - Connect with other birders
+     - Checklist submission to eBird
   
   7. **Advanced Filters**:
 
      - Filter by rarity
      - Show only species not yet seen
      - Seasonal filters
+     - Life list integration
 
 ---
 

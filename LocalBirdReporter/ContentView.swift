@@ -56,7 +56,7 @@ struct ContentView: View
             } // action
           )
           {
-            Text("Supported by eBird")
+            Text("Powered by eBird")
               .font(.subheadline)
               .foregroundColor(.blue)
           } // Button
@@ -88,6 +88,19 @@ struct ContentView: View
           .top,
           2
         )
+        
+        // Manual location name display
+        if viewModel.isUsingManualLocation, let locationName = viewModel.manualLocationName
+        {
+          Text(locationName)
+            .font(.caption)
+            .foregroundColor(.orange)
+            .fontWeight(.semibold)
+            .padding(
+              .top,
+              4
+            )
+        }
 
         Text("Sorted by: \(viewModel.sortMode.rawValue)")
           .font(.caption)
@@ -174,14 +187,16 @@ struct ContentView: View
       } // if
       else if !viewModel.birds.isEmpty
       {
-        List(viewModel.birds)
-        {
-          bird in
-          VStack(
-            alignment: .leading,
-            spacing   : 4
-          )
+        ScrollViewReader
+        { proxy in
+          List(viewModel.birds)
           {
+            bird in
+            VStack(
+              alignment: .leading,
+              spacing   : 4
+            )
+            {
             Button(
               action:
               {
@@ -238,8 +253,21 @@ struct ContentView: View
             4
           )
           .listRowBackground(bird.isNew ? Color.yellow.opacity(0.1) : Color.clear)
+          .id(bird.id)
         } // bird in
         .listStyle(.plain)
+        .onChange(of: viewModel.shouldScrollToTop)
+        { oldValue, newValue in
+          if newValue, let firstBird = viewModel.birds.first
+          {
+            withAnimation
+            {
+              proxy.scrollTo(firstBird.id, anchor: .top)
+            }
+            viewModel.shouldScrollToTop = false
+          }
+        }
+        } // ScrollViewReader
       } // else if
       else
       {

@@ -12,7 +12,7 @@ import UIKit
 
 enum BirdSortMode: String, CaseIterable, Codable
 {
-  case closest      = "Closest to Me"
+  case closest      = "Closest"
   case mostRecent   = "Most Recently Reported"
   case largestCount = "Largest Number"
 
@@ -40,6 +40,10 @@ class BirdReporterViewModel
   var isSpeaking                   = false
   var seenBirdIds                  : Set<String> = []
   var lastKnownLocation            : CLLocation?
+  var manualLocation               : CLLocation?
+  var manualLocationName           : String?
+  var isUsingManualLocation        = false
+  var shouldScrollToTop            = false
 
   var maxBirdsToDisplay: Int
   {
@@ -154,6 +158,9 @@ class BirdReporterViewModel
           userLocation: location
         )
         birds = sortedBirds
+        
+        // Trigger scroll to top in the view
+        shouldScrollToTop = true
 
       } // if
 
@@ -278,7 +285,7 @@ class BirdReporterViewModel
     } // if
     else
     {
-      sortMode = .closest
+      sortMode = .largestCount
 
     } // else
 
@@ -436,90 +443,125 @@ class BirdReporterViewModel
 
     } // if
 
-    // Always set sort mode to closest when fetching
-
-    sortMode = .closest
-
     isLoading = true
     errorMessage = nil
 
     Task
     {
-      // Always request fresh location to ensure we have current position
+      // Use manual location if set, otherwise request fresh GPS location
       
-      await MainActor.run
-      {
-        locationManager.requestLocation()
-
-      } // await MainActor.run
-
-      // Wait for location update (up to 5 seconds)
+      let location: CLLocation
       
-      for _ in 0..<10
+      if let manual = manualLocation, isUsingManualLocation
       {
-        try? await Task.sleep(nanoseconds: 500_000_000)
-
-        if locationManager.location != nil
-        {
-          break
-
-        } // if
-
-      } // for
-
-      guard let location = locationManager.location else
+        location = manual
+      }
+      else
       {
         await MainActor.run
         {
-          errorMessage = "Location not available. Please check " +
-                         "Settings > Privacy > Location Services " +
-                         "and ensure it's enabled for this app."
-          isLoading = false
+          locationManager.requestLocation()
 
         } // await MainActor.run
 
-        return
+        // Wait for location update (up to 5 seconds)
+        
+        for _ in 0..<10
+        {
+          try? await Task.sleep(nanoseconds: 500_000_000)
 
-      } // guard
+          if locationManager.location != nil
+          {
+            break
 
-      // Check if location has changed significantly
+          } // if
+
+        } // for
+
+        guard let gpsLocation = locationManager.location else
+        {
+          await MainActor.run
+          {
+            errorMessage = "Location not available. Please check " +
+                           "Settings > Privacy > Location Services " +
+                           "and ensure it's enabled for this app."
+            isLoading = false
+
+          } // await MainActor.run
+
+          return
+
+        } // guard
+        
+        location = gpsLocation
+      }
+
+      // Check if location has changed significantly (only when NOT using manual location)
 
       await MainActor.run
       {
         print("Current location: \(location.coordinate.latitude), \(location.coordinate.longitude)")
-        print("Reset distance threshold: \(resetDistanceKm) km")
         
-        if let lastLocation = lastKnownLocation
+        // Skip distance-based reset when using manual location
+        if !isUsingManualLocation
         {
-          let distanceInMeters = location.distance(from: lastLocation)
-          let distanceInKm = distanceInMeters / 1000.0
-          let distanceInMiles = distanceInMeters / 1609.34
-
-          print("Last location: \(lastLocation.coordinate.latitude), \(lastLocation.coordinate.longitude)")
-          print("Distance from last location: \(String(format: "%.1f", distanceInKm)) km")
-
-          // Format distance based on user preference
-          let distanceValue = distanceUnit == .miles ? distanceInMiles : distanceInKm
-          let distanceString = String(format: "%.1f", distanceValue)
-          let unitString = distanceUnit == .miles ? "mi" : "km"
-          let thresholdValue = distanceUnit == .miles ? Int(Double(resetDistanceKm) / 1.60934) : resetDistanceKm
-
-          if distanceInKm > Double(resetDistanceKm)
+          print("Reset distance threshold: \(resetDistanceKm) km")
+          
+          if let lastLocation = lastKnownLocation
           {
-            // Significant location change - clear everything and start fresh
+            let distanceInMeters = location.distance(from: lastLocation)
+            let distanceInKm = distanceInMeters / 1000.0
+            let distanceInMiles = distanceInMeters / 1609.34
+
+            print("Last location: \(lastLocation.coordinate.latitude), \(lastLocation.coordinate.longitude)")
+            print("Distance from last location: \(String(format: "%.1f", distanceInKm)) km")
+
+            // Format distance based on user preference
+            let distanceValue = distanceUnit == .miles ? distanceInMiles : distanceInKm
+            let distanceString = String(format: "%.1f", distanceValue)
+            let unitString = distanceUnit == .miles ? "mi" : "km"
+            let thresholdValue = distanceUnit == .miles ? Int(Double(resetDistanceKm) / 1.60934) : resetDistanceKm
+
+            if distanceInKm > Double(resetDistanceKm)
+            {
+              // Significant location change - clear everything and start fresh
+              
+              print("Location changed by \(String(format: "%.1f", distanceInKm)) km - resetting seen birds")
+              distanceMessage = "Moved \(distanceString) \(unitString) - Reset birds"
+              
+              // Clear seen bird IDs
+              seenBirdIds.removeAll()
+              saveSeenBirdIds()
+              
+              // Clear birds list for fresh start
+              birds.removeAll()
+              saveBirds()
+              
+              // Update last known location ONLY when we reset
+              lastKnownLocation = location
+              UserDefaults.standard.set(
+                location.coordinate.latitude,
+                forKey: "lastKnownLatitude"
+              )
+              UserDefaults.standard.set(
+                location.coordinate.longitude,
+                forKey: "lastKnownLongitude"
+              )
+
+            } // if
+            else
+            {
+              print("Distance \(String(format: "%.1f", distanceInKm)) km is less than threshold \(resetDistanceKm) km - NOT resetting")
+              distanceMessage = "Moved \(distanceString) \(unitString) (< \(thresholdValue) \(unitString) threshold)"
+            }
+
+          } // if
+          else
+          {
+            print("No last known location - this is first fetch")
+            distanceMessage = "First location check"
             
-            print("Location changed by \(String(format: "%.1f", distanceInKm)) km - resetting seen birds")
-            distanceMessage = "Moved \(distanceString) \(unitString) - Reset birds"
-            
-            // Clear seen bird IDs
-            seenBirdIds.removeAll()
-            saveSeenBirdIds()
-            
-            // Clear birds list for fresh start
-            birds.removeAll()
-            saveBirds()
-            
-            // Update last known location ONLY when we reset
+            // Set initial last known location on first fetch
             lastKnownLocation = location
             UserDefaults.standard.set(
               location.coordinate.latitude,
@@ -529,30 +571,12 @@ class BirdReporterViewModel
               location.coordinate.longitude,
               forKey: "lastKnownLongitude"
             )
-
-          } // if
-          else
-          {
-            print("Distance \(String(format: "%.1f", distanceInKm)) km is less than threshold \(resetDistanceKm) km - NOT resetting")
-            distanceMessage = "Moved \(distanceString) \(unitString) (< \(thresholdValue) \(unitString) threshold)"
           }
-
-        } // if
+        }
         else
         {
-          print("No last known location - this is first fetch")
-          distanceMessage = "First location check"
-          
-          // Set initial last known location on first fetch
-          lastKnownLocation = location
-          UserDefaults.standard.set(
-            location.coordinate.latitude,
-            forKey: "lastKnownLatitude"
-          )
-          UserDefaults.standard.set(
-            location.coordinate.longitude,
-            forKey: "lastKnownLongitude"
-          )
+          // Using manual location - no distance-based updates
+          print("Using manual location - no distance tracking")
         }
 
       } // await MainActor.run
@@ -599,16 +623,19 @@ class BirdReporterViewModel
 
           } // for
 
+          // Sort new birds by user's preference
           let sortedNewBirds = sortBirds(
             newOrChangedBirds,
             userLocation: location
           )
 
+          // Sort unchanged birds by user's preference
           let sortedExistingBirds = sortBirds(
             unchangedBirds,
             userLocation: location
           )
 
+          // Display: new birds first, then unchanged birds
           let combinedBirds = sortedNewBirds + sortedExistingBirds
 
           birds = Array(combinedBirds.prefix(maxBirdsToDisplay))
@@ -630,18 +657,17 @@ class BirdReporterViewModel
           } // if
           else
           {
-            // Manual fetch: speak new birds first, then fill with closest birds
+            // Manual fetch: speak new birds first, then unchanged birds
+            // Use the same sort order as display (user's selected sort mode)
             
             let newBirdsSorted = sortBirds(
               newOrChangedBirds,
-              userLocation  : location,
-              forceSortMode : .closest
+              userLocation  : location
             )
             
             let unchangedBirdsSorted = sortBirds(
               unchangedBirds,
-              userLocation  : location,
-              forceSortMode : .closest
+              userLocation  : location
             )
             
             // Prioritize new birds, then add unchanged birds to fill up to maxBirdsToSpeak
@@ -652,6 +678,13 @@ class BirdReporterViewModel
           } // else
 
           isLoading = false
+          
+          // Scroll to top after fetch completes
+          // Reset to false first to ensure onChange triggers
+          shouldScrollToTop = false
+          Task { @MainActor in
+            shouldScrollToTop = true
+          }
 
         } // await MainActor.run
 
@@ -683,6 +716,52 @@ class BirdReporterViewModel
     } // Task
 
   } // func fetchBirds
+
+  // ------------------------------
+
+  func setManualLocation(_ location: CLLocation, name: String)
+  {
+    manualLocation = location
+    manualLocationName = name
+    isUsingManualLocation = true
+    
+    // Clear everything for fresh start at new location
+    seenBirdIds.removeAll()
+    saveSeenBirdIds()
+    
+    birds.removeAll()
+    saveBirds()
+    
+    lastKnownLocation = nil
+    UserDefaults.standard.removeObject(forKey: "lastKnownLatitude")
+    UserDefaults.standard.removeObject(forKey: "lastKnownLongitude")
+    
+    distanceMessage = "Manual location set"
+    
+  } // func setManualLocation
+
+  // ------------------------------
+
+  func clearManualLocation()
+  {
+    manualLocation = nil
+    manualLocationName = nil
+    isUsingManualLocation = false
+    
+    // Clear everything for fresh start with real GPS
+    seenBirdIds.removeAll()
+    saveSeenBirdIds()
+    
+    birds.removeAll()
+    saveBirds()
+    
+    lastKnownLocation = nil
+    UserDefaults.standard.removeObject(forKey: "lastKnownLatitude")
+    UserDefaults.standard.removeObject(forKey: "lastKnownLongitude")
+    
+    distanceMessage = "Using current location"
+    
+  } // func clearManualLocation
 
   // ------------------------------
 
@@ -767,12 +846,11 @@ class BirdReporterViewModel
     userLocation: CLLocation
   )
   {
-    // Sort new birds by closest first
+    // Sort new birds using user's selected sort mode
 
     let sortedNewBirds = sortBirds(
       newBirds,
-      userLocation: userLocation,
-      forceSortMode: .closest
+      userLocation: userLocation
     )
 
     let birdsToSpeak = Array(sortedNewBirds.prefix(maxBirdsToSpeak))

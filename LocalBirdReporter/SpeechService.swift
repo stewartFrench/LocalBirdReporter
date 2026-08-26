@@ -21,9 +21,20 @@ class SpeechService
 
   static func getAvailableVoices() -> [AVSpeechSynthesisVoice]
   {
-    return AVSpeechSynthesisVoice.speechVoices().filter
+    let allEnglishVoices = AVSpeechSynthesisVoice.speechVoices().filter
     {
       $0.language.hasPrefix("en")
+    }
+    
+    // Remove duplicates by keeping first occurrence of each name
+    var seenNames = Set<String>()
+    return allEnglishVoices.filter { voice in
+      if seenNames.contains(voice.name) {
+        return false
+      } else {
+        seenNames.insert(voice.name)
+        return true
+      }
     }
   } // getAvailableVoices
   
