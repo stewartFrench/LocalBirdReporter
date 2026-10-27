@@ -10,6 +10,8 @@ import CoreLocation
 import AVFoundation
 import UIKit
 
+// ----------------------------------------
+
 enum BirdSortMode: String, CaseIterable, Codable
 {
   case closest      = "Closest"
@@ -26,6 +28,37 @@ enum DistanceUnit: String, CaseIterable, Codable
   case miles      = "Miles"
 
 } // enum DistanceUnit
+
+// ----------------------------------------
+// A manually-set location the user can quickly reselect from Change Location
+
+struct RecentLocation: Codable, Identifiable
+{
+  let name      : String
+  let latitude  : Double
+  let longitude : Double
+
+  // ------------------------------
+  // Computed property for Identifiable
+
+  var id: String
+  {
+    "\(name)_\(latitude)_\(longitude)"
+
+  } // id
+
+  // ------------------------------
+
+  var coordinate: CLLocationCoordinate2D
+  {
+    CLLocationCoordinate2D(
+      latitude  : latitude,
+      longitude : longitude
+    )
+
+  } // coordinate
+
+} // struct RecentLocation
 
 // ----------------------------------------
 
@@ -80,7 +113,7 @@ class BirdReporterViewModel
         forKey: "checkIntervalMinutes"
       )
 
-      // If auto-check is running, restart it with new interval
+              // If auto-check is running, restart it with new interval
 
       if isAutoCheckEnabled
       {
@@ -100,8 +133,9 @@ class BirdReporterViewModel
         resetDistanceKm,
         forKey: "resetDistanceKm"
       )
-      
-      // Clear distance message when threshold changes
+
+              // Clear distance message when threshold changes
+
       distanceMessage = nil
 
     } // didSet
@@ -147,8 +181,8 @@ class BirdReporterViewModel
 
       } // if
 
-      // Re-sort the existing birds list when sort mode changes
-      // Do NOT trigger speaking, only update display
+              // Re-sort the existing birds list when sort mode changes
+              // Do NOT trigger speaking, only update display
 
       if let location = locationManager.location
       {
@@ -158,8 +192,9 @@ class BirdReporterViewModel
           userLocation: location
         )
         birds = sortedBirds
-        
-        // Trigger scroll to top in the view
+
+                // Trigger scroll to top in the view
+
         shouldScrollToTop = true
 
       } // if
@@ -180,8 +215,9 @@ class BirdReporterViewModel
         )
 
       } // if
-      
-      // Clear distance message when unit changes so it updates on next fetch
+
+              // Clear distance message when unit changes so it updates on next fetch
+
       distanceMessage = nil
 
     } // didSet
@@ -231,6 +267,23 @@ class BirdReporterViewModel
 
   } // var announceNoNewBirds
 
+  var recentLocations: [RecentLocation] = []
+  {
+    didSet
+    {
+      if let encoded = try? JSONEncoder().encode(recentLocations)
+      {
+        UserDefaults.standard.set(
+          encoded,
+          forKey: "recentLocations"
+        )
+
+      } // if
+
+    } // didSet
+
+  } // var recentLocations
+
   private var birdService   : eBirdService
   private var speech        : SpeechService
   private var timer         : Timer?
@@ -242,7 +295,8 @@ class BirdReporterViewModel
 
   init()
   {
-    // Initialize required properties first
+
+            // Initialize required properties first
 
     locationManager = LocationManager()
     birdService = eBirdService()
@@ -254,7 +308,7 @@ class BirdReporterViewModel
 
     maxBirdsToSpeak = UserDefaults.standard.object(
       forKey: "maxBirdsToSpeak"
-    ) as? Int ?? 7
+    ) as? Int ?? 10
 
     checkIntervalMinutes = UserDefaults.standard.object(
       forKey: "checkIntervalMinutes"
@@ -270,7 +324,7 @@ class BirdReporterViewModel
 
     daysBack = UserDefaults.standard.object(
       forKey: "daysBack"
-    ) as? Int ?? 1
+    ) as? Int ?? 7
 
     if let savedSortMode = UserDefaults.standard.data(
       forKey: "birdSortMode"
@@ -328,9 +382,21 @@ class BirdReporterViewModel
       seenBirdIds = Set(savedIds)
 
     } // if
-    
-    // Now setup silent audio and notifications
-    
+
+    if let savedRecentLocations = UserDefaults.standard.data(
+      forKey: "recentLocations"
+    ),
+       let decodedLocations = try? JSONDecoder().decode(
+         [RecentLocation].self,
+         from: savedRecentLocations
+       )
+    {
+      recentLocations = decodedLocations
+
+    } // if
+
+            // Now setup silent audio and notifications
+
     setupSilentAudioPlayer()
     setupNotifications()
 
@@ -346,19 +412,24 @@ class BirdReporterViewModel
 
     } // if
 
-    // Clear last known location on app launch
-    // This ensures every app launch starts fresh with "First location check"
-    // and prevents GPS drift from showing false movement messages
-    
+            // Clear last known location on app launch
+            // This ensures every app launch starts fresh with "First location check"
+            // and prevents GPS drift from showing false movement messages
+
     lastKnownLocation = nil
     UserDefaults.standard.removeObject(forKey: "lastKnownLatitude")
     UserDefaults.standard.removeObject(forKey: "lastKnownLongitude")
-    
-    // Mark first launch (but don't enable auto-check by default)
+
+            // Mark first launch (but don't enable auto-check by default)
+
     if UserDefaults.standard.object(forKey: "hasLaunchedBefore") == nil
     {
-      UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
-    }
+      UserDefaults.standard.set(
+        true,
+        forKey: "hasLaunchedBefore"
+      )
+
+    } // if
 
   } // init
 
@@ -377,7 +448,7 @@ class BirdReporterViewModel
     stopAutoCheck()
     isAutoCheckEnabled = true
 
-    // Start silent audio to keep app active in background
+            // Start silent audio to keep app active in background
 
     startSilentAudio()
 
@@ -395,11 +466,14 @@ class BirdReporterViewModel
 
     } // timer
 
-    // Add timer to run loop for background execution
+            // Add timer to run loop for background execution
 
     if let timer = timer
     {
-      RunLoop.main.add(timer, forMode: .common)
+      RunLoop.main.add(
+        timer,
+        forMode: .common
+      )
 
     } // if
 
@@ -416,7 +490,7 @@ class BirdReporterViewModel
     timer = nil
     isAutoCheckEnabled = false
 
-    // Stop silent audio when auto-check is stopped
+            // Stop silent audio when auto-check is stopped
 
     stopSilentAudio()
 
@@ -434,7 +508,9 @@ class BirdReporterViewModel
 
   // ------------------------------
 
-  func fetchBirds(isAutoCheck: Bool = false)
+  func fetchBirds(
+    isAutoCheck: Bool = false
+  )
   {
     if apiKey.isEmpty
     {
@@ -448,14 +524,16 @@ class BirdReporterViewModel
 
     Task
     {
-      // Use manual location if set, otherwise request fresh GPS location
-      
+
+              // Use manual location if set, otherwise request fresh GPS location
+
       let location: CLLocation
-      
+
       if let manual = manualLocation, isUsingManualLocation
       {
         location = manual
-      }
+
+      } // if
       else
       {
         await MainActor.run
@@ -464,8 +542,8 @@ class BirdReporterViewModel
 
         } // await MainActor.run
 
-        // Wait for location update (up to 5 seconds)
-        
+                // Wait for location update (up to 5 seconds)
+
         for _ in 0..<10
         {
           try? await Task.sleep(nanoseconds: 500_000_000)
@@ -478,7 +556,8 @@ class BirdReporterViewModel
 
         } // for
 
-        guard let gpsLocation = locationManager.location else
+        guard let gpsLocation = locationManager.location
+        else
         {
           await MainActor.run
           {
@@ -492,52 +571,75 @@ class BirdReporterViewModel
           return
 
         } // guard
-        
-        location = gpsLocation
-      }
 
-      // Check if location has changed significantly (only when NOT using manual location)
+        location = gpsLocation
+
+      } // else
+
+              // Check if location has changed significantly (only when NOT using manual location)
 
       await MainActor.run
       {
-        print("Current location: \(location.coordinate.latitude), \(location.coordinate.longitude)")
-        
-        // Skip distance-based reset when using manual location
+        print(
+          "Current location: " +
+          "\(location.coordinate.latitude), " +
+          "\(location.coordinate.longitude)"
+        )
+
+                // Skip distance-based reset when using manual location
+
         if !isUsingManualLocation
         {
           print("Reset distance threshold: \(resetDistanceKm) km")
-          
+
           if let lastLocation = lastKnownLocation
           {
             let distanceInMeters = location.distance(from: lastLocation)
-            let distanceInKm = distanceInMeters / 1000.0
-            let distanceInMiles = distanceInMeters / 1609.34
+            let distanceInKm     = distanceInMeters / 1000.0
+            let distanceInMiles  = distanceInMeters / 1609.34
 
-            print("Last location: \(lastLocation.coordinate.latitude), \(lastLocation.coordinate.longitude)")
-            print("Distance from last location: \(String(format: "%.1f", distanceInKm)) km")
+            print(
+              "Last location: " +
+              "\(lastLocation.coordinate.latitude), " +
+              "\(lastLocation.coordinate.longitude)"
+            )
+            print(
+              "Distance from last location: " +
+              "\(String(format: "%.1f", distanceInKm)) km"
+            )
 
-            // Format distance based on user preference
-            let distanceValue = distanceUnit == .miles ? distanceInMiles : distanceInKm
+                    // Format distance based on user preference
+
+            let distanceValue  = distanceUnit == .miles ? distanceInMiles : distanceInKm
             let distanceString = String(format: "%.1f", distanceValue)
-            let unitString = distanceUnit == .miles ? "mi" : "km"
-            let thresholdValue = distanceUnit == .miles ? Int(Double(resetDistanceKm) / 1.60934) : resetDistanceKm
+            let unitString     = distanceUnit == .miles ? "mi" : "km"
+            let thresholdValue = distanceUnit == .miles
+              ? Int(Double(resetDistanceKm) / 1.60934)
+              : resetDistanceKm
 
             if distanceInKm > Double(resetDistanceKm)
             {
-              // Significant location change - clear everything and start fresh
-              
-              print("Location changed by \(String(format: "%.1f", distanceInKm)) km - resetting seen birds")
+
+                      // Significant location change - clear everything and start fresh
+
+              print(
+                "Location changed by " +
+                "\(String(format: "%.1f", distanceInKm)) km - resetting seen birds"
+              )
               distanceMessage = "Moved \(distanceString) \(unitString) - Reset birds"
-              
-              // Clear seen bird IDs
+
+                      // Clear seen bird IDs
+
               seenBirdIds.removeAll()
               saveSeenBirdIds()
-              
-              // Clear birds list for fresh start
+
+                      // Clear birds list for fresh start
+
               birds.removeAll()
               saveBirds()
-              
-              // Update last known location ONLY when we reset
+
+                      // Update last known location ONLY when we reset
+
               lastKnownLocation = location
               UserDefaults.standard.set(
                 location.coordinate.latitude,
@@ -551,17 +653,23 @@ class BirdReporterViewModel
             } // if
             else
             {
-              print("Distance \(String(format: "%.1f", distanceInKm)) km is less than threshold \(resetDistanceKm) km - NOT resetting")
-              distanceMessage = "Moved \(distanceString) \(unitString) (< \(thresholdValue) \(unitString) threshold)"
-            }
+              print(
+                "Distance \(String(format: "%.1f", distanceInKm)) km is less than " +
+                "threshold \(resetDistanceKm) km - NOT resetting"
+              )
+              distanceMessage = "Moved \(distanceString) \(unitString) " +
+                                "(< \(thresholdValue) \(unitString) threshold)"
+
+            } // else
 
           } // if
           else
           {
             print("No last known location - this is first fetch")
             distanceMessage = "First location check"
-            
-            // Set initial last known location on first fetch
+
+                    // Set initial last known location on first fetch
+
             lastKnownLocation = location
             UserDefaults.standard.set(
               location.coordinate.latitude,
@@ -571,13 +679,18 @@ class BirdReporterViewModel
               location.coordinate.longitude,
               forKey: "lastKnownLongitude"
             )
-          }
-        }
+
+          } // else
+
+        } // if
         else
         {
-          // Using manual location - no distance-based updates
+
+                  // Using manual location - no distance-based updates
+
           print("Using manual location - no distance tracking")
-        }
+
+        } // else
 
       } // await MainActor.run
 
@@ -595,7 +708,8 @@ class BirdReporterViewModel
         for obs in observations.prefix(5)
         {
           print("  - \(obs.comName) at \(obs.locName), \(obs.obsDt)")
-        }
+
+        } // for
 
         await MainActor.run
         {
@@ -604,7 +718,8 @@ class BirdReporterViewModel
 
           for var observation in observations
           {
-            // Use location-based ID so same species at different location is "new"
+
+                    // Use location-based ID so same species at different location is "new"
 
             let locationId = observation.locationBasedId
 
@@ -623,19 +738,22 @@ class BirdReporterViewModel
 
           } // for
 
-          // Sort new birds by user's preference
+                  // Sort new birds by user's preference
+
           let sortedNewBirds = sortBirds(
             newOrChangedBirds,
             userLocation: location
           )
 
-          // Sort unchanged birds by user's preference
+                  // Sort unchanged birds by user's preference
+
           let sortedExistingBirds = sortBirds(
             unchangedBirds,
             userLocation: location
           )
 
-          // Display: new birds first, then unchanged birds
+                  // Display: new birds first, then unchanged birds
+
           let combinedBirds = sortedNewBirds + sortedExistingBirds
 
           birds = Array(combinedBirds.prefix(maxBirdsToDisplay))
@@ -643,12 +761,13 @@ class BirdReporterViewModel
           saveBirds()
           saveSeenBirdIds()
 
-          // Speech behavior depends on whether this is an auto-check
-          
+                  // Speech behavior depends on whether this is an auto-check
+
           if isAutoCheck
           {
-            // Auto-check: only speak new birds
-            
+
+                    // Auto-check: only speak new birds
+
             speakNewBirdsOnly(
               newOrChangedBirds,
               userLocation: location
@@ -657,20 +776,22 @@ class BirdReporterViewModel
           } // if
           else
           {
-            // Manual fetch: speak new birds first, then unchanged birds
-            // Use the same sort order as display (user's selected sort mode)
-            
+
+                    // Manual fetch: speak new birds first, then unchanged birds
+                    // Use the same sort order as display (user's selected sort mode)
+
             let newBirdsSorted = sortBirds(
               newOrChangedBirds,
-              userLocation  : location
+              userLocation: location
             )
-            
+
             let unchangedBirdsSorted = sortBirds(
               unchangedBirds,
-              userLocation  : location
+              userLocation: location
             )
-            
-            // Prioritize new birds, then add unchanged birds to fill up to maxBirdsToSpeak
+
+                    // Prioritize new birds, then add unchanged birds to fill up to maxBirdsToSpeak
+
             let birdsToSpeak = newBirdsSorted + unchangedBirdsSorted
 
             speakBirdsInOrder(Array(birdsToSpeak.prefix(maxBirdsToSpeak)))
@@ -678,13 +799,18 @@ class BirdReporterViewModel
           } // else
 
           isLoading = false
-          
-          // Scroll to top after fetch completes
-          // Reset to false first to ensure onChange triggers
+
+                  // Scroll to top after fetch completes
+                  // Reset to false first to ensure onChange triggers
+
           shouldScrollToTop = false
-          Task { @MainActor in
+          Task
+          {
+            @MainActor in
+
             shouldScrollToTop = true
-          }
+
+          } // Task
 
         } // await MainActor.run
 
@@ -719,25 +845,34 @@ class BirdReporterViewModel
 
   // ------------------------------
 
-  func setManualLocation(_ location: CLLocation, name: String)
+  func setManualLocation(
+    _ location : CLLocation,
+    name       : String
+  )
   {
     manualLocation = location
     manualLocationName = name
     isUsingManualLocation = true
-    
-    // Clear everything for fresh start at new location
+
+    addRecentLocation(
+      name     : name,
+      location : location
+    )
+
+            // Clear everything for fresh start at new location
+
     seenBirdIds.removeAll()
     saveSeenBirdIds()
-    
+
     birds.removeAll()
     saveBirds()
-    
+
     lastKnownLocation = nil
     UserDefaults.standard.removeObject(forKey: "lastKnownLatitude")
     UserDefaults.standard.removeObject(forKey: "lastKnownLongitude")
-    
+
     distanceMessage = "Manual location set"
-    
+
   } // func setManualLocation
 
   // ------------------------------
@@ -747,21 +882,85 @@ class BirdReporterViewModel
     manualLocation = nil
     manualLocationName = nil
     isUsingManualLocation = false
-    
-    // Clear everything for fresh start with real GPS
+
+            // Clear everything for fresh start with real GPS
+
     seenBirdIds.removeAll()
     saveSeenBirdIds()
-    
+
     birds.removeAll()
     saveBirds()
-    
+
     lastKnownLocation = nil
     UserDefaults.standard.removeObject(forKey: "lastKnownLatitude")
     UserDefaults.standard.removeObject(forKey: "lastKnownLongitude")
-    
+
     distanceMessage = "Using current location"
-    
+
   } // func clearManualLocation
+
+  // ------------------------------
+
+  func addRecentLocation(
+    name     : String,
+    location : CLLocation
+  )
+  {
+    let newLocation = RecentLocation(
+      name      : name,
+      latitude  : location.coordinate.latitude,
+      longitude : location.coordinate.longitude
+    )
+
+            // Remove any existing entry for this name so it moves to the front
+
+    recentLocations.removeAll
+    {
+      $0.name == name
+
+    } // removeAll
+
+    recentLocations.insert(
+      newLocation,
+      at: 0
+    )
+
+    if recentLocations.count > 5
+    {
+      recentLocations = Array(recentLocations.prefix(5))
+
+    } // if
+
+  } // func addRecentLocation
+
+  // ------------------------------
+
+  func resetToDefaults()
+  {
+    sortMode                = .largestCount
+    searchRadiusKm          = 3
+    daysBack                = 7
+    maxBirdsToDisplay       = 50
+    resetDistanceKm         = 3
+    checkIntervalMinutes    = 2
+    announceNoNewBirds      = false
+    maxBirdsToSpeak         = 10
+    selectedVoiceIdentifier = nil
+    distanceUnit            = .kilometers
+
+    if isAutoCheckEnabled
+    {
+      stopAutoCheck()
+
+    } // if
+
+    if isUsingManualLocation
+    {
+      clearManualLocation()
+
+    } // if
+
+  } // func resetToDefaults
 
   // ------------------------------
 
@@ -776,29 +975,38 @@ class BirdReporterViewModel
 
     } // guard
 
-    // Check if all birds are new
-    let allBirdsAreNew = birds.allSatisfy { $0.isNew }
+            // Check if all birds are new
+
+    let allBirdsAreNew = birds.allSatisfy
+    {
+      $0.isNew
+
+    } // allSatisfy
 
     var speechParts: [String] = []
-    
-    // Add "New Birds" prefix if all birds are new
+
+            // Add "New Birds" prefix if all birds are new
+
     if allBirdsAreNew
     {
       speechParts.append("New Birds")
-    }
+
+    } // if
 
     for bird in birds
     {
       var birdText = ""
 
-      // Only say "New" if not all birds are new (mixed scenario)
+              // Only say "New" if not all birds are new (mixed scenario)
+
       if bird.isNew && !allBirdsAreNew
       {
         birdText = "New, "
 
       } // if
 
-      // Add count before bird name if available
+              // Add count before bird name if available
+
       if let count = bird.howMany
       {
         birdText += "\(count) "
@@ -842,11 +1050,12 @@ class BirdReporterViewModel
   // ------------------------------
 
   private func speakNewBirdsOnly(
-    _ newBirds: [BirdObservation],
-    userLocation: CLLocation
+    _ newBirds   : [BirdObservation],
+    userLocation : CLLocation
   )
   {
-    // Sort new birds using user's selected sort mode
+
+            // Sort new birds using user's selected sort mode
 
     let sortedNewBirds = sortBirds(
       newBirds,
@@ -857,7 +1066,8 @@ class BirdReporterViewModel
 
     if birdsToSpeak.isEmpty
     {
-      // No new birds - announce this only if enabled
+
+              // No new birds - announce this only if enabled
 
       if announceNoNewBirds
       {
@@ -884,7 +1094,7 @@ class BirdReporterViewModel
 
     } // if
 
-    // We have new birds - speak them
+            // We have new birds - speak them
 
     var speechParts: [String] = ["New Birds"]
 
@@ -892,7 +1102,8 @@ class BirdReporterViewModel
     {
       var birdText = ""
 
-      // Add count before bird name if available
+              // Add count before bird name if available
+
       if let count = bird.howMany
       {
         birdText = "\(count) "
@@ -961,20 +1172,21 @@ class BirdReporterViewModel
 
   private func setupSilentAudioPlayer()
   {
-    // Create a 1 second silent audio buffer
+
+            // Create a 1 second silent audio buffer
 
     let sampleRate = 44100.0
     let duration   = 1.0
     let frameCount = UInt32(sampleRate * duration)
 
     guard let format = AVAudioFormat(
-      standardFormatWithSampleRate: sampleRate,
-      channels: 1
-    ),
-    let buffer = AVAudioPCMBuffer(
-      pcmFormat: format,
-      frameCapacity: frameCount
-    )
+            standardFormatWithSampleRate: sampleRate,
+            channels                    : 1
+          ),
+          let buffer = AVAudioPCMBuffer(
+            pcmFormat     : format,
+            frameCapacity : frameCount
+          )
     else
     {
       return
@@ -983,7 +1195,7 @@ class BirdReporterViewModel
 
     buffer.frameLength = frameCount
 
-    // Fill with silence (zeros)
+            // Fill with silence (zeros)
 
     if let channelData = buffer.floatChannelData
     {
@@ -996,22 +1208,23 @@ class BirdReporterViewModel
 
     } // if
 
-    // Create temporary file for silent audio
+            // Create temporary file for silent audio
 
     let tempDir    = FileManager.default.temporaryDirectory
     let silenceURL = tempDir.appendingPathComponent("silence.caf")
 
     do
     {
-      // Write silent audio to file
+
+              // Write silent audio to file
 
       let audioFile = try AVAudioFile(
-        forWriting: silenceURL,
-        settings: format.settings
+        forWriting : silenceURL,
+        settings   : format.settings
       )
       try audioFile.write(from: buffer)
 
-      // Setup audio player with the silent file
+              // Setup audio player with the silent file
 
       audioPlayer = try AVAudioPlayer(contentsOf: silenceURL)
       audioPlayer?.numberOfLoops = -1
@@ -1038,15 +1251,15 @@ class BirdReporterViewModel
 
     } // guard
 
-    // Configure audio session for background playback
+            // Configure audio session for background playback
 
     do
     {
       let audioSession = AVAudioSession.sharedInstance()
       try audioSession.setCategory(
         .playback,
-        mode: .voicePrompt,
-        options: [.mixWithOthers]
+        mode    : .voicePrompt,
+        options : [.mixWithOthers]
       )
       try audioSession.setActive(true)
 
@@ -1061,14 +1274,16 @@ class BirdReporterViewModel
     {
       player.play()
 
-      // Verify playback started after a brief delay
+              // Verify playback started after a brief delay
 
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.5)
       {
         [weak self] in
+
         if self?.audioPlayer?.isPlaying == false
         {
-          // Retry if failed
+
+                  // Retry if failed
 
           self?.audioPlayer?.play()
 
@@ -1092,29 +1307,30 @@ class BirdReporterViewModel
 
   private func setupNotifications()
   {
-    // Observe audio session interruptions
+
+            // Observe audio session interruptions
 
     NotificationCenter.default.addObserver(
       self,
-      selector: #selector(handleAudioSessionInterruption),
-      name: AVAudioSession.interruptionNotification,
-      object: AVAudioSession.sharedInstance()
+      selector : #selector(handleAudioSessionInterruption),
+      name     : AVAudioSession.interruptionNotification,
+      object   : AVAudioSession.sharedInstance()
     )
 
-    // Monitor app lifecycle
+            // Monitor app lifecycle
 
     NotificationCenter.default.addObserver(
       self,
-      selector: #selector(appDidEnterBackground),
-      name: UIApplication.didEnterBackgroundNotification,
-      object: nil
+      selector : #selector(appDidEnterBackground),
+      name     : UIApplication.didEnterBackgroundNotification,
+      object   : nil
     )
 
     NotificationCenter.default.addObserver(
       self,
-      selector: #selector(appWillEnterForeground),
-      name: UIApplication.willEnterForegroundNotification,
-      object: nil
+      selector : #selector(appWillEnterForeground),
+      name     : UIApplication.willEnterForegroundNotification,
+      object   : nil
     )
 
   } // setupNotifications
@@ -1136,7 +1352,8 @@ class BirdReporterViewModel
 
     if type == .ended
     {
-      // Interruption ended - restart silent audio if auto-check is enabled
+
+              // Interruption ended - restart silent audio if auto-check is enabled
 
       if isAutoCheckEnabled
       {
@@ -1162,7 +1379,8 @@ class BirdReporterViewModel
 
   @objc private func appDidEnterBackground()
   {
-    // Ensure silent audio is playing when entering background
+
+            // Ensure silent audio is playing when entering background
 
     if isAutoCheckEnabled
     {
@@ -1176,7 +1394,8 @@ class BirdReporterViewModel
 
   @objc private func appWillEnterForeground()
   {
-    // Verify silent audio is still running
+
+            // Verify silent audio is still running
 
     if isAutoCheckEnabled
     {
@@ -1193,9 +1412,9 @@ class BirdReporterViewModel
   // ------------------------------
 
   private func sortBirds(
-    _ birds      : [BirdObservation],
-    userLocation : CLLocation,
-    forceSortMode: BirdSortMode? = nil
+    _ birds       : [BirdObservation],
+    userLocation  : CLLocation,
+    forceSortMode : BirdSortMode? = nil
   ) -> [BirdObservation]
   {
     let modeToUse = forceSortMode ?? sortMode
@@ -1207,12 +1426,12 @@ class BirdReporterViewModel
       {
         first, second in
 
-        let firstCount = first.howMany ?? 0
+        let firstCount  = first.howMany ?? 0
         let secondCount = second.howMany ?? 0
 
         return firstCount > secondCount
 
-      } // return
+      } // sorted
 
     case .mostRecent:
       return birds.sorted
@@ -1221,7 +1440,7 @@ class BirdReporterViewModel
 
         return first.obsDt > second.obsDt
 
-      } // return
+      } // sorted
 
     case .closest:
       return birds.sorted
@@ -1229,23 +1448,23 @@ class BirdReporterViewModel
         first, second in
 
         let firstLocation = CLLocation(
-          latitude : first.lat,
-          longitude: first.lng
+          latitude  : first.lat,
+          longitude : first.lng
         )
 
         let secondLocation = CLLocation(
-          latitude : second.lat,
-          longitude: second.lng
+          latitude  : second.lat,
+          longitude : second.lng
         )
 
-        let firstDistance = userLocation.distance(from: firstLocation)
+        let firstDistance  = userLocation.distance(from: firstLocation)
         let secondDistance = userLocation.distance(from: secondLocation)
 
-        // If distances are essentially the same (within 1 meter), sort by count
+                // If distances are essentially the same (within 1 meter), sort by count
 
         if abs(firstDistance - secondDistance) < 1.0
         {
-          let firstCount = first.howMany ?? 0
+          let firstCount  = first.howMany ?? 0
           let secondCount = second.howMany ?? 0
           return firstCount > secondCount
 
@@ -1253,7 +1472,7 @@ class BirdReporterViewModel
 
         return firstDistance < secondDistance
 
-      } // return
+      } // sorted
 
     } // switch
 

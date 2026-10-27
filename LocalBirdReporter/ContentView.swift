@@ -11,9 +11,11 @@ import SwiftUI
 
 struct ContentView: View
 {
-  @State private var viewModel        = BirdReporterViewModel()
-  @State private var showingSettings  = false
+  @State private var viewModel         = BirdReporterViewModel()
+  @State private var showingSettings   = false
   @State private var showingAbouteBird = false
+
+  // ------------------------------
 
   var body: some View
   {
@@ -22,7 +24,7 @@ struct ContentView: View
     )
     {
 
-      // Centered Title at the very top with settings button
+              // Centered Title at the very top with settings button
 
       VStack(
         spacing: 4
@@ -88,19 +90,45 @@ struct ContentView: View
           .top,
           2
         )
-        
-        // Manual location name display
-        if viewModel.isUsingManualLocation, let locationName = viewModel.manualLocationName
+
+                // Location display with button to reset to current GPS location
+
+        HStack(
+          spacing: 6
+        )
         {
-          Text(locationName)
-            .font(.caption)
-            .foregroundColor(.orange)
-            .fontWeight(.semibold)
-            .padding(
-              .top,
-              4
-            )
-        }
+          if viewModel.isUsingManualLocation, let locationName = viewModel.manualLocationName
+          {
+            Text(locationName)
+              .font(.caption)
+              .foregroundColor(.orange)
+              .fontWeight(.semibold)
+          } // if
+          else
+          {
+            Text("Using current GPS location")
+              .font(.caption)
+              .foregroundColor(.secondary)
+          } // else
+
+          Button(
+            action:
+            {
+              viewModel.clearManualLocation()
+            } // action
+          )
+          {
+            Image(systemName: "location.fill")
+              .font(.caption)
+              .foregroundColor(.blue)
+          } // Button
+          .disabled(!viewModel.isUsingManualLocation)
+
+        } // HStack
+        .padding(
+          .top,
+          4
+        )
 
         Text("Sorted by: \(viewModel.sortMode.rawValue)")
           .font(.caption)
@@ -109,6 +137,16 @@ struct ContentView: View
             .top,
             6
           )
+
+        Text(
+          viewModel.distanceUnit == .kilometers
+            ? "Search radius: \(viewModel.searchRadiusKm) km   " +
+              "From last: \(viewModel.daysBack) days"
+            : "Search radius: \(Int(Double(viewModel.searchRadiusKm) / 1.60934)) miles   " +
+              "From last: \(viewModel.daysBack) days"
+        )
+          .font(.caption)
+          .foregroundColor(.secondary)
       } // VStack
       .padding(
         .top,
@@ -120,7 +158,7 @@ struct ContentView: View
       )
       .background(Color(UIColor.systemBackground))
 
-      // Fixed-height status area outside NavigationStack
+              // Fixed-height status area outside NavigationStack
 
       VStack
       {
@@ -161,7 +199,7 @@ struct ContentView: View
       )
       .background(Color(UIColor.systemBackground))
 
-      // Main content area
+              // Main content area
 
       if viewModel.birds.isEmpty && !viewModel.isLoading && viewModel.errorMessage == nil
       {
@@ -188,85 +226,93 @@ struct ContentView: View
       else if !viewModel.birds.isEmpty
       {
         ScrollViewReader
-        { proxy in
+        {
+          proxy in
+
           List(viewModel.birds)
           {
             bird in
+
             VStack(
-              alignment: .leading,
+              alignment : .leading,
               spacing   : 4
             )
-            {
-            Button(
-              action:
-              {
-                openBirdInfo(for: bird)
-              } // action
-            )
-            {
-              HStack
-              {
-                if bird.isNew
-                {
-                  NewBadge()
-                } // if
-                Text(bird.comName)
-                  .font(.headline)
-                  .fontWeight(bird.isNew ? .bold : .regular)
-                  .foregroundColor(.primary)
-                Spacer()
-                if let count = bird.howMany
-                {
-                  Text("\(count)")
-                    .font(.headline)
-                    .foregroundColor(.blue)
-                } // if
-              } // HStack
-            } // Button
-            .buttonStyle(.plain)
-
-            HStack
             {
               Button(
                 action:
                 {
-                  openBirdLocation(for: bird)
+                  openBirdInfo(for: bird)
                 } // action
               )
               {
-                Text(bird.locName)
-                  .font(.caption)
-                  .foregroundColor(.blue)
-                  .underline()
+                HStack
+                {
+                  if bird.isNew
+                  {
+                    NewBadge()
+                  } // if
+                  Text(bird.comName)
+                    .font(.headline)
+                    .fontWeight(bird.isNew ? .bold : .regular)
+                    .foregroundColor(.primary)
+                  Spacer()
+                  if let count = bird.howMany
+                  {
+                    Text("\(count)")
+                      .font(.headline)
+                      .foregroundColor(.blue)
+                  } // if
+                } // HStack
               } // Button
               .buttonStyle(.plain)
 
-              Spacer()
-            } // HStack
+              HStack
+              {
+                Button(
+                  action:
+                  {
+                    openBirdLocation(for: bird)
+                  } // action
+                )
+                {
+                  Text(bird.locName)
+                    .font(.caption)
+                    .foregroundColor(.blue)
+                    .underline()
+                } // Button
+                .buttonStyle(.plain)
 
-            Text(formatDate(bird.obsDt))
-              .font(.caption2)
-              .foregroundColor(.secondary)
-          } // VStack
-          .padding(
-            .vertical,
-            4
-          )
-          .listRowBackground(bird.isNew ? Color.yellow.opacity(0.1) : Color.clear)
-          .id(bird.id)
-        } // bird in
-        .listStyle(.plain)
-        .onChange(of: viewModel.shouldScrollToTop)
-        { oldValue, newValue in
-          if newValue, let firstBird = viewModel.birds.first
+                Spacer()
+              } // HStack
+
+              Text(formatDate(bird.obsDt))
+                .font(.caption2)
+                .foregroundColor(.secondary)
+            } // VStack
+            .padding(
+              .vertical,
+              4
+            )
+            .listRowBackground(bird.isNew ? Color.yellow.opacity(0.1) : Color.clear)
+            .id(bird.id)
+          } // List
+          .listStyle(.plain)
+          .onChange(of: viewModel.shouldScrollToTop)
           {
-            withAnimation
+            oldValue, newValue in
+
+            if newValue, let firstBird = viewModel.birds.first
             {
-              proxy.scrollTo(firstBird.id, anchor: .top)
-            }
-            viewModel.shouldScrollToTop = false
-          }
-        }
+              withAnimation
+              {
+                proxy.scrollTo(
+                  firstBird.id,
+                  anchor: .top
+                )
+              } // withAnimation
+              viewModel.shouldScrollToTop = false
+            } // if
+          } // onChange
         } // ScrollViewReader
       } // else if
       else
@@ -274,14 +320,14 @@ struct ContentView: View
         Spacer()
       } // else
 
-      // Fixed buttons at bottom
+              // Fixed buttons at bottom
 
       VStack(
         spacing: 12
       )
       {
 
-        // Stop Speaking button
+                // Stop Speaking button
 
         Button(
           action:
@@ -307,7 +353,7 @@ struct ContentView: View
         } // Button
         .disabled(!viewModel.isSpeaking)
 
-        // Fetch Local Birds button
+                // Fetch Local Birds button
 
         Button(
           action:
@@ -327,8 +373,16 @@ struct ContentView: View
             maxWidth: .infinity
           )
           .padding()
-          .background((viewModel.isLoading || viewModel.isSpeaking) ? Color.gray.opacity(0.3) : Color.blue)
-          .foregroundColor((viewModel.isLoading || viewModel.isSpeaking) ? Color.gray : Color.white)
+          .background(
+            (viewModel.isLoading || viewModel.isSpeaking)
+              ? Color.gray.opacity(0.3)
+              : Color.blue
+          )
+          .foregroundColor(
+            (viewModel.isLoading || viewModel.isSpeaking)
+              ? Color.gray
+              : Color.white
+          )
           .cornerRadius(10)
         } // Button
         .disabled(viewModel.isLoading || viewModel.isSpeaking)
@@ -362,7 +416,8 @@ struct ContentView: View
     for bird: BirdObservation
   )
   {
-    // Create URL for eBird species page using the species code
+
+            // Create URL for eBird species page using the species code
 
     let urlString = "https://ebird.org/species/\(bird.speciesCode)"
 
@@ -373,16 +428,18 @@ struct ContentView: View
       UIApplication.shared.open(url)
     } // if
   } // openBirdInfo
-  
+
   // ------------------------------
 
   private func openBirdLocation(
     for bird: BirdObservation
   )
   {
-    // Create Apple Maps URL with the bird's coordinates
 
-    let urlString = "http://maps.apple.com/?q=\(bird.lat),\(bird.lng)&ll=\(bird.lat),\(bird.lng)"
+            // Create Apple Maps URL with the bird's coordinates
+
+    let urlString = "http://maps.apple.com/?q=\(bird.lat),\(bird.lng)" +
+                    "&ll=\(bird.lat),\(bird.lng)"
 
     print("Opening map for: \(bird.comName) at \(bird.locName) - \(urlString)")
 
@@ -391,13 +448,15 @@ struct ContentView: View
       UIApplication.shared.open(url)
     } // if
   } // openBirdLocation
-  
+
   // ------------------------------
 
-  private func formatDate(_ dateString: String) -> String
+  private func formatDate(
+    _ dateString: String
+  ) -> String
   {
 
-    // eBird date format is "2026-08-06 14:30" (year-month-day hour:minute)
+            // eBird date format is "2026-08-06 14:30" (year-month-day hour:minute)
 
     let formatter = DateFormatter()
     formatter.dateFormat = "yyyy-MM-dd HH:mm"
@@ -419,7 +478,7 @@ struct ContentView: View
 struct NewBadge: View
 {
   @State private var isAnimating = false
-  
+
   // ------------------------------
 
   var body: some View

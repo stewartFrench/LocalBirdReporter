@@ -21,7 +21,8 @@ struct BirdObservation: Codable, Identifiable
   let lat         : Double
   let lng         : Double
 
-  // Track if this is a new bird
+          // Track if this is a new bird
+
   var isNew       : Bool = false
   
   // ------------------------------

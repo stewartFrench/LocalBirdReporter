@@ -26,15 +26,17 @@ struct LocalBirdReporterApp: App
 } // struct LocalBirdReporterApp
 
 // ----------------------------------------
-// Force portrait orientation only
+
+          // Force portrait orientation only
 
 class AppDelegate: NSObject, UIApplicationDelegate
 {
+
   // ------------------------------
 
   func application(
-    _ application                           : UIApplication,
-    supportedInterfaceOrientationsFor window: UIWindow?
+    _ application                            : UIApplication,
+    supportedInterfaceOrientationsFor window : UIWindow?
   ) -> UIInterfaceOrientationMask
   {
     return .portrait

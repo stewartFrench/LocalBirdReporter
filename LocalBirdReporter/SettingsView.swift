@@ -12,10 +12,11 @@ import AVFoundation
 
 struct SettingsView: View
 {
-  @Binding var viewModel                : BirdReporterViewModel
+  @Binding var viewModel                   : BirdReporterViewModel
   @Environment(\.dismiss) var dismiss
-  @State private var availableVoices    : [AVSpeechSynthesisVoice] = []
+  @State private var availableVoices       : [AVSpeechSynthesisVoice] = []
   @State private var showingChangeLocation = false
+  @State private var showingResetConfirmation = false
 
   // ------------------------------
 
@@ -38,7 +39,9 @@ struct SettingsView: View
               BirdSortMode.allCases,
               id: \.self
             )
-            { mode in
+            {
+              mode in
+
               Text(mode.rawValue).tag(mode)
 
             } // ForEach
@@ -68,7 +71,8 @@ struct SettingsView: View
           Stepper(
             viewModel.distanceUnit == .kilometers
               ? "Mark all birds New after moving: \(viewModel.resetDistanceKm) km"
-              : "Mark all birds New after moving: \(Int(Double(viewModel.resetDistanceKm) / 1.60934)) miles",
+              : "Mark all birds New after moving: " +
+                "\(Int(Double(viewModel.resetDistanceKm) / 1.60934)) miles",
             value : $viewModel.resetDistanceKm,
             in    : 1...50
           )
@@ -82,26 +86,37 @@ struct SettingsView: View
           Button("Change Location")
           {
             showingChangeLocation = true
-          }
-          
+
+          } // Button
+
+          Button("Use Current Location")
+          {
+            viewModel.clearManualLocation()
+
+          } // Button
+          .disabled(!viewModel.isUsingManualLocation)
+
           if viewModel.isUsingManualLocation, let locationName = viewModel.manualLocationName
           {
             Text("Currently: \(locationName)")
               .font(.caption)
               .foregroundColor(.secondary)
-          }
+
+          } // if
           else if viewModel.isUsingManualLocation
           {
             Text("Using manual location")
               .font(.caption)
               .foregroundColor(.secondary)
-          }
+
+          } // else if
           else
           {
             Text("Using current GPS location")
               .font(.caption)
               .foregroundColor(.secondary)
-          }
+
+          } // else
 
         } // Section Location
 
@@ -122,7 +137,9 @@ struct SettingsView: View
           .onChange(
             of: viewModel.isAutoCheckEnabled
           )
-          { oldValue, newValue in
+          {
+            oldValue, newValue in
+
             if newValue
             {
               viewModel.startAutoCheck()
@@ -148,8 +165,8 @@ struct SettingsView: View
         )
         {
           Stepper(
-            viewModel.maxBirdsToSpeak == 0 
-              ? "Speaking: Off" 
+            viewModel.maxBirdsToSpeak == 0
+              ? "Speaking: Off"
               : "Speak: \(viewModel.maxBirdsToSpeak) birds",
             value : $viewModel.maxBirdsToSpeak,
             in    : 0...30
@@ -164,8 +181,16 @@ struct SettingsView: View
           Picker(
             "Voice",
             selection: Binding(
-              get: { viewModel.selectedVoiceIdentifier ?? "" },
-              set: { viewModel.selectedVoiceIdentifier = $0.isEmpty ? nil : $0 }
+              get :
+              {
+                viewModel.selectedVoiceIdentifier ?? ""
+
+              }, // get
+              set :
+              {
+                viewModel.selectedVoiceIdentifier = $0.isEmpty ? nil : $0
+
+              } // set
             )
           )
           {
@@ -173,7 +198,9 @@ struct SettingsView: View
               availableVoices,
               id: \.identifier
             )
-            { voice in
+            {
+              voice in
+
               Text(voice.name).tag(voice.identifier)
 
             } // ForEach
@@ -195,7 +222,9 @@ struct SettingsView: View
               DistanceUnit.allCases,
               id: \.self
             )
-            { unit in
+            {
+              unit in
+
               Text(unit.rawValue).tag(unit)
 
             } // ForEach
@@ -210,7 +239,7 @@ struct SettingsView: View
         {
           SecureField(
             "API Key",
-            text  : $viewModel.apiKey
+            text: $viewModel.apiKey
           )
           .autocorrectionDisabled()
           .textInputAutocapitalization(.never)
@@ -222,6 +251,23 @@ struct SettingsView: View
           .font(.caption)
 
         } // Section eBird API
+
+        Section
+        {
+          Button(
+            "Reset to Defaults",
+            role: .destructive
+          )
+          {
+            showingResetConfirmation = true
+
+          } // Button
+          .frame(
+            maxWidth  : .infinity,
+            alignment : .center
+          )
+
+        } // Section Reset
 
       } // Form
       .navigationTitle("Settings")
@@ -248,10 +294,40 @@ struct SettingsView: View
       } // toolbar
       .sheet(isPresented: $showingChangeLocation)
       {
-        ChangeLocationView(viewModel: viewModel, dismissSettings: {
-          dismiss()
-        })
-      }
+        ChangeLocationView(
+          viewModel       : viewModel,
+          dismissSettings :
+          {
+            dismiss()
+
+          } // dismissSettings
+        )
+
+      } // sheet
+      .confirmationDialog(
+        "Reset all settings to their defaults?",
+        isPresented    : $showingResetConfirmation,
+        titleVisibility: .visible
+      )
+      {
+        Button(
+          "Reset to Defaults",
+          role: .destructive
+        )
+        {
+          viewModel.resetToDefaults()
+
+        } // Button
+
+        Button(
+          "Cancel",
+          role: .cancel
+        )
+        {
+
+        } // Button
+
+      } // confirmationDialog
 
     } // NavigationStack
 

@@ -17,7 +17,7 @@ class LocationManager: NSObject, CLLocationManagerDelegate
   var location                    : CLLocation?
 
   var authorizationStatus         : CLAuthorizationStatus = .notDetermined
-  
+
   // ------------------------------
 
   override init()
@@ -28,47 +28,50 @@ class LocationManager: NSObject, CLLocationManagerDelegate
     manager.allowsBackgroundLocationUpdates = true
     manager.pausesLocationUpdatesAutomatically = false
   } // init
-  
+
   // ------------------------------
 
   func requestLocation()
   {
-    // Request always authorization for background location
+
+            // Request always authorization for background location
+
     manager.requestAlwaysAuthorization()
-    
-    // Start continuous location monitoring
+
+            // Start continuous location monitoring
+
     manager.startUpdatingLocation()
   } // requestLocation
-  
+
   // ------------------------------
-  
+
   func stopLocationUpdates()
   {
     manager.stopUpdatingLocation()
   } // stopLocationUpdates
-  
+
   // MARK: - CLLocationManagerDelegate
-  
+
   // ------------------------------
 
   func locationManager(
-    _ manager   : CLLocationManager,
-    didUpdateLocations locations: [CLLocation]
+    _ manager                    : CLLocationManager,
+    didUpdateLocations locations : [CLLocation]
   )
   {
     location = locations.first
   } // locationManager didUpdateLocations
-  
+
   // ------------------------------
 
   func locationManager(
-    _ manager       : CLLocationManager,
-    didFailWithError error: Error
+    _ manager              : CLLocationManager,
+    didFailWithError error : Error
   )
   {
     print("Location error: \(error.localizedDescription)")
   } // locationManager didFailWithError
-  
+
   // ------------------------------
 
   func locationManagerDidChangeAuthorization(

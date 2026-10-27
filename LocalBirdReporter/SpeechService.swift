@@ -13,40 +13,50 @@ import AVFAudio
 
 class SpeechService
 {
-  private let synthesizer : AVSpeechSynthesizer = AVSpeechSynthesizer()
-  var selectedVoiceIdentifier: String?
-  
+  private let synthesizer     : AVSpeechSynthesizer = AVSpeechSynthesizer()
+  var selectedVoiceIdentifier : String?
+
   // ------------------------------
-  // Get available English voices
+
+          // Get available English voices
 
   static func getAvailableVoices() -> [AVSpeechSynthesisVoice]
   {
     let allEnglishVoices = AVSpeechSynthesisVoice.speechVoices().filter
     {
       $0.language.hasPrefix("en")
-    }
-    
-    // Remove duplicates by keeping first occurrence of each name
+    } // filter
+
+            // Remove duplicates by keeping first occurrence of each name
+
     var seenNames = Set<String>()
-    return allEnglishVoices.filter { voice in
-      if seenNames.contains(voice.name) {
+    return allEnglishVoices.filter
+    {
+      voice in
+
+      if seenNames.contains(voice.name)
+      {
         return false
-      } else {
+      } // if
+      else
+      {
         seenNames.insert(voice.name)
         return true
-      }
-    }
+      } // else
+    } // filter
   } // getAvailableVoices
-  
+
   // ------------------------------
-  // Speak a single bird name
+
+          // Speak a single bird name
 
   func speak(
     _ text: String
   )
   {
-    // Configure audio session for speech
-    // Use mixWithOthers to allow silent background audio to continue
+
+            // Configure audio session for speech
+            // Use mixWithOthers to allow silent background audio to continue
 
     do
     {
@@ -56,32 +66,33 @@ class SpeechService
         options : [.mixWithOthers]
       )
       try AVAudioSession.sharedInstance().setActive(true)
-    }
+    } // do
     catch
     {
       print("Failed to set up audio session: \(error)")
     } // catch
-    
+
     let utterance = AVSpeechUtterance(string: text)
-    
-    // Use selected voice or default to en-US
-    
+
+            // Use selected voice or default to en-US
+
     if let voiceId = selectedVoiceIdentifier,
        let voice = AVSpeechSynthesisVoice(identifier: voiceId)
     {
       utterance.voice = voice
-    }
+    } // if
     else
     {
       utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-    }
-    
+    } // else
+
     utterance.rate = 0.5
     synthesizer.speak(utterance)
   } // speak
-  
+
   // ------------------------------
-  // Speak bird observations with counts
+
+          // Speak bird observations with counts
 
   func speakBirds(
     _ birds: [BirdObservation]
@@ -92,8 +103,8 @@ class SpeechService
     {
       return
     } // else
-    
-    // Build speech text with bird name and count
+
+            // Build speech text with bird name and count
 
     var speechParts: [String] = []
 
@@ -105,16 +116,17 @@ class SpeechService
       {
         birdText += ", \(count)"
       } // if
-      
+
       speechParts.append(birdText)
     } // for
-    
+
     let combinedText = speechParts.joined(separator: ". ")
     speak(combinedText)
   } // speakBirds
-  
+
   // ------------------------------
-  // Stop any ongoing speech
+
+          // Stop any ongoing speech
 
   func stopSpeaking()
   {

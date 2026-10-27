@@ -1,15 +1,15 @@
 
 # LocalBirdReporter - Discover Birds While You Drive
 
-Tired of missing rare birds that were spotted just down the road? Local Bird Reporter is your automatic birding companion that announces nearby bird observations as you travel.
+Local Bird Reporter is your automatic birding companion that speaks to report nearby birds as you travel.  Your iPhone can be on standby and in your pocket and LocalBirdReporter will speak to report bird siting through your bluetooth earbuds or headphones.
 
-When you run Local Bird Reporter on your iPhone, it automatically checks for recent bird sightings from eBird in your area and announces new birds via text-to-speech. It runs in background and standby at custom intervals (as low as every minute), so you'll never miss interesting birds reported near your current location.
+The app is smart about location changes - when you drive, bike, or walk more than a configurable distance, it automatically speaks to report birds at your new location. Perfect for birding road trips where you're visiting multiple parks or wildlife areas in a day.
 
-The app is smart about location changes - when you drive more than a configurable distance (for example, 3 km), it automatically resets and treats all birds at your new location as "new". Perfect for birding road trips where you're visiting multiple parks or wildlife areas in a day!
+When you run LocalBirdReporter on your iPhone and tap "Fetch Local Birds" the app automatically checks eBird for recent bird sightings in your area and speaks to report them.  If "Auto Check" is set then LocalBirdReporter will periodically check if you have moved to a new location and speak to report new birds in that location. So when you are driving around an area the app will speak to report birds as your location changes.
 
-You can now manually select and monitor specific locations. Pin a wildlife refuge, park, or birding hotspot on the map and get alerts for birds reported there - even when you're miles away. Perfect for keeping tabs on your favorite birding locations remotely.
+You can also manually select and monitor specific locations. Pick a wildlife refuge, park, or birding hotspot on the map and get spoken reports of birds reported there - even when you're miles away. Perfect for keeping tabs on your favorite birding locations remotely.
 
-Some observations are so exciting you'll want to pull over and try to spot them yourself! The app provides direct links to eBird species pages and maps to the observation locations.
+Some observations are so exciting you'll want to pull over and try to spot them yourself! The app provides direct links to eBird species pages and maps to the observation locations.  Just tap the bird name to get directed to eBird, or tap the location to get directed to that spot in Apple Maps.
 
 
 -----------------------------------------------
@@ -19,7 +19,7 @@ Some observations are so exciting you'll want to pull over and try to spot them 
 - **Manual location pinning** - Set a fixed location to monitor remotely
 - **Interactive maps** - Search for locations or tap on map with satellite view option
 - **Text-to-speech announcements** - Hear about new birds without looking at your phone
-- **Smart location tracking** - Auto-resets when you move to new areas (GPS mode only)
+- **Smart location tracking** - Reports new birds when you move areas
 - **Background operation** - Runs continuously with configurable check intervals
 - **Customizable display** - Sort by distance, count, or recency
 - **Voice selection** - Choose from available English voices
@@ -29,21 +29,28 @@ Some observations are so exciting you'll want to pull over and try to spot them 
 -----------------------------------------------
 ## Example Use Cases
 
-**Road Trip Birding**: Enable auto-check and drive through birding areas. The app automatically announces new birds as you travel, resetting when you move to new locations.
+**Road Trip Birding**: Enable auto-check and drive through birding areas. The app automatically announces new birds as you travel.
 
 **Monitor a Hotspot**: Pin your local wildlife refuge on the map and get alerts whenever interesting birds are reported there - perfect for planning your next visit.
 
-**Park Hopping**: Visit multiple parks in a day. The app resets birds at each new location, so you hear about local specialties at every stop.
+**Park Hopping**: Visit multiple parks in a day. The app speaks to report birds at each new location.
 
-**Rare Bird Chase**: When you hear about a rarity, tap the location to open maps and navigate there. Tap the bird name to learn more on eBird.
+**Rare Bird Chase**: When you hear about a rarity, tap the location to open Apple Maps and navigate there. Tap the bird name to learn more on eBird.
 
-**Hands-Free Birding**: Use speech announcements while driving or hiking. No need to look at your phone - just listen for new birds.
+**Hands-Free Birding**: Put on your earbuds or earphones and LocalBirdReporter will speak to report birds. No need to look at your phone.  Keep it in your pocket while you use your camera or binoculars.
 
-**Sort By**: The default is to show you the birds sorted by "Largest Number" (biggest flocks first) but you can change this.  Tap Settings and notice "Sort By".  Here you can change it to "Closest", "Most Recently Reported" or "Largest Number".
+**Sort By**: The default is to show you the birds sorted by "Largest Number" (biggest flocks first) but you can change this.  Tap Settings and notice "Sort By".  Here you can change it to "Closest", "Most Recently Reported" or "Largest Number".  LocalBirdReporter will remember your settings for next time you run the app.
 
-**Here is one that I use a lot**:  I tap "Fetch Local Birds" to get a list of birds near me.
-Sometimes there are no birds shown!  Why?  I tap Settings and change the "Search Radius" to a larger number, say, 5 km.  Then tap Done and "Fetch Local Birds" again.  This usually turns up some birds.
-Also in Settings,  I can change "Show birds from last:" to a longer time, say, 7 days, or 14 days.  Now, even with a smaller "Search Radius" I can tap "Fetch Local Birds" and possibly turn up some birds.
+**Here is one that I use a lot**:
+
+    I tap "Fetch Local Birds" to get a list of birds near me. Sometimes there are no birds shown!  Why?  
+
+    I tap Settings and change the "Search Radius" to a larger number, say, 5 km.  
+    Then tap Done and "Fetch Local Birds" again.  
+    This usually turns up some birds and LocalBirdReporter will speak to report them.
+
+    Also in Settings, I can change "Show birds from last:" to a longer time, say, 7 days, or 14 days.  
+    Now, even with a smaller "Search Radius" I can tap "Fetch Local Birds" and possibly turn up some birds.
 
 
 -----------------------------------------------
