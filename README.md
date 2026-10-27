@@ -31,15 +31,15 @@ Some observations are so exciting you'll want to pull over and try to spot them 
 
 **Here is one that I use a lot**:
 
-I tap "Fetch Local Birds" to get a list of birds near me. 
-  Sometimes there are no birds shown!  Why?
-  I tap Settings and change the "Search Radius" to a larger number, say, 5 km.  
-  Then tap Done and "Fetch Local Birds" again.  
-  This usually turns up some birds and LocalBirdReporter will speak to report them.
-  Also in Settings, I can change "Show birds from last:" to a longer time, 
-  say, 7 days, or 14 days.  
-  Now, even with a smaller "Search Radius" I can tap "Fetch Local Birds" 
-  and possibly turn up some birds.
+> I tap "Fetch Local Birds" to get a list of birds near me. 
+> Sometimes there are no birds shown!  Why?
+> I tap Settings and change the "Search Radius" to a larger number, say, 5 km.  
+> Then tap Done and "Fetch Local Birds" again.  
+> This usually turns up some birds and LocalBirdReporter will speak to report them.
+> Also in Settings, I can change "Show birds from last:" to a longer time, 
+> say, 7 days, or 14 days.  
+> Now, even with a smaller "Search Radius" I can tap "Fetch Local Birds" 
+> and possibly turn up some birds.
 
 **Monitor a Hotspot**: Select a local wildlife refuge on the map and see what interesting birds have been reported there - perfect for planning your next visit.
 
