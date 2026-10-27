@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# Emacs
+.#*
+*~
+\#*#
+
+# Xcode
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+DerivedData/
