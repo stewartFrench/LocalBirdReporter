@@ -1,7 +1,7 @@
 
 # LocalBirdReporter - Discover Birds While You Drive
 
-Local Bird Reporter is your automatic birding companion that speaks to report nearby birds as you travel.  Your iPhone can be on standby and in your pocket and LocalBirdReporter will speak to report bird siting through your bluetooth earbuds or headphones.
+Local Bird Reporter is your automatic birding companion that speaks to report nearby birds as you travel.  Your iPhone can be on standby and in your pocket and LocalBirdReporter will speak to report birds through your earbuds or headphones.
 
 The app is smart about location changes - when you drive, bike, or walk more than a configurable distance, it automatically speaks to report birds at your new location. Perfect for birding road trips where you're visiting multiple parks or wildlife areas in a day.
 
@@ -15,9 +15,9 @@ Some observations are so exciting you'll want to pull over and try to spot them 
 -----------------------------------------------
 ## Key Features
 
-- **Automatic bird discovery** - Fetches recent observations from eBird based on your location
-- **Manual location pinning** - Set a fixed location to monitor remotely
-- **Interactive maps** - Search for locations or tap on map with satellite view option
+- **Automatic bird discovery** - Fetches recent sightings from eBird based on your location
+- **Manual location** - Select a remote location to monitor
+- **Interactive maps** - Search for locations or tap on the map with satellite view option
 - **Text-to-speech announcements** - Hear about new birds without looking at your phone
 - **Smart location tracking** - Reports new birds when you move areas
 - **Background operation** - Runs continuously with configurable check intervals
@@ -29,18 +29,6 @@ Some observations are so exciting you'll want to pull over and try to spot them 
 -----------------------------------------------
 ## Example Use Cases
 
-**Road Trip Birding**: Enable auto-check and drive through birding areas. The app automatically announces new birds as you travel.
-
-**Monitor a Hotspot**: Pin your local wildlife refuge on the map and get alerts whenever interesting birds are reported there - perfect for planning your next visit.
-
-**Park Hopping**: Visit multiple parks in a day. The app speaks to report birds at each new location.
-
-**Rare Bird Chase**: When you hear about a rarity, tap the location to open Apple Maps and navigate there. Tap the bird name to learn more on eBird.
-
-**Hands-Free Birding**: Put on your earbuds or earphones and LocalBirdReporter will speak to report birds. No need to look at your phone.  Keep it in your pocket while you use your camera or binoculars.
-
-**Sort By**: The default is to show you the birds sorted by "Largest Number" (biggest flocks first) but you can change this.  Tap Settings and notice "Sort By".  Here you can change it to "Closest", "Most Recently Reported" or "Largest Number".  LocalBirdReporter will remember your settings for next time you run the app.
-
 **Here is one that I use a lot**:
 
     I tap "Fetch Local Birds" to get a list of birds near me. Sometimes there are no birds shown!  Why?  
@@ -51,6 +39,18 @@ Some observations are so exciting you'll want to pull over and try to spot them 
 
     Also in Settings, I can change "Show birds from last:" to a longer time, say, 7 days, or 14 days.  
     Now, even with a smaller "Search Radius" I can tap "Fetch Local Birds" and possibly turn up some birds.
+
+**Monitor a Hotspot**: Select a local wildlife refuge on the map and see what interesting birds have been reported there - perfect for planning your next visit.
+
+**Road Trip Birding**: Enable auto-check and drive through birding areas. The app automatically announces new birds as you travel.
+
+**Park Hopping**: Visit multiple parks in a day. The app speaks to report birds at each new location.
+
+**Rare Bird Chase**: When you hear about a rarity, tap the location to open Apple Maps and navigate there. Tap the bird name to learn more on eBird.
+
+**Hands-Free Birding**: Put on your earbuds or earphones and LocalBirdReporter will speak to report birds. No need to look at your phone.  Keep it in your pocket while you use your camera or binoculars.
+
+**Sort By**: The default is to show you the birds sorted by "Largest Number" (biggest flocks first) but you can change this.  Tap Settings and notice "Sort By".  Here you can change it to "Closest", "Most Recently Reported" or "Largest Number".  LocalBirdReporter will remember your settings for next time you run the app.
 
 
 -----------------------------------------------
