@@ -5,7 +5,7 @@ Local Bird Reporter is your automatic birding companion that speaks to report ne
 
 The app is smart about location changes - when you drive, bike, or walk more than a configurable distance, it automatically speaks to report birds at your new location. Perfect for birding road trips where you're visiting multiple parks or wildlife areas in a day.
 
-When you run LocalBirdReporter on your iPhone and tap "Fetch Local Birds" the app automatically checks eBird for recent bird sightings in your area and speaks to report them.  If "Auto Check" is set then LocalBirdReporter will periodically check if you have moved to a new location and speaks to report new birds in that location.  So when you are driving around an area the app will automatically speak up to report birds asf your location changes.
+When you run LocalBirdReporter on your iPhone and tap "Fetch Local Birds" the app automatically checks eBird for recent bird sightings in your area and speaks to report them.  If "Auto Check" is set then LocalBirdReporter will periodically check if you have moved to a new location and speaks to report new birds in that location.  So when you are driving around an area the app will automatically speak up to report birds as your location changes.
 
 You can also manually select and monitor specific locations. Pick a wildlife refuge, park, or birding hotspot on the map and get spoken reports of birds reported there - even when you're miles away. Perfect for keeping tabs on your favorite birding locations remotely.
 
