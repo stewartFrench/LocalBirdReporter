@@ -166,17 +166,17 @@ struct ContentView: View
         {
           ProgressView("Fetching birds...")
         } // if
-        else if let message = viewModel.distanceMessage
-        {
-          Text(message)
-            .foregroundColor(.primary)
-            .font(.caption)
-            .multilineTextAlignment(.center)
-        } // else if
         else if let error = viewModel.errorMessage
         {
           Text(error)
             .foregroundColor(.red)
+            .font(.caption)
+            .multilineTextAlignment(.center)
+        } // else if
+        else if let message = viewModel.distanceMessage
+        {
+          Text(message)
+            .foregroundColor(.primary)
             .font(.caption)
             .multilineTextAlignment(.center)
         } // else if

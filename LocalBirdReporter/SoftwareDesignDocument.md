@@ -2,11 +2,11 @@
 ## Local Bird Reporter iOS Application
 ## Built in Xcode as "LocalBirdReporter"
 
-**Version:** 1.0
+**Version:** 2.0
 
-**Date:** August 25, 2026
+**Date:** October 28, 2026
 
-**Author:** Stewart French, Claude Sonnet 4.5 by Anthropic
+**Author:** Stewart French, Claude Sonnet 5 by Anthropic
 
 ## Table of Contents
 
@@ -31,30 +31,29 @@
 
 Local Bird Reporter is an iOS application that helps birders discover
 nearby bird observations while driving or moving through different
-areas. The app automatically announces new birds via speech synthesis
+areas. The app automatically speaks to announce new birds
 and maintains awareness of location changes.
 
 ### Key Capabilities
 
-  - Fetch recent bird observations from eBird API based on current GPS
-    location or manually selected location
+  - Fetches recent bird observations from eBird API based on current GPS
+    location or a manually selected location
     
-  - Manually select and pin locations (e.g., wildlife refuges) for
-    remote monitoring
+  - Supports an interactive map with satellite view for location selection
+
+  - Supports quick re-selection from up to 5 recent locations
     
-  - Interactive map with satellite view for location selection
-    
-  - Automatically check for new birds at configurable intervals
+  - Automatically checks for new birds at configurable intervals; this
+    setting persists and resumes automatically on the next launch
 
-  - Speak bird names and counts using text-to-speech
+  - Speaks the observation location, then bird names and counts
 
-  - Track which birds have been "seen" and identify new observations
+  - Tracks which birds have been "seen" and speaks any new bird observations
 
-  - Reset bird list when moving beyond a configurable distance
+  - Resets bird list when moving beyond a configurable distance
     threshold (GPS mode only)
 
-  - Operate in background with location updates and speech
-    announcements
+  - Operates in background with location updates and speech announcements
 
 
 ### Target Platform
@@ -68,6 +67,7 @@ and maintains awareness of location changes.
 ## Architecture
 
 ### Design Pattern
+
 The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 
 ```
@@ -101,6 +101,7 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 │  - BirdObservation          │  Data structures
 │  - BirdSortMode             │  Enums
 │  - DistanceUnit             │
+│  - RecentLocation           │  Quick-select location history
 └─────────────────────────────┘
 ```
 
@@ -137,7 +138,8 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
   4. Receives array of bird observations
   5. Categorizes birds as "new" or "previously seen"
   6. Displays sorted list (new birds first)
-  7. Speaks bird names using text-to-speech
+  7. Speaks the location of the first bird in the list, then speaks
+     bird names using text-to-speech
 
 **Key Components**:
      
@@ -221,7 +223,39 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 - Silent audio keeps app active in background
 - Auto-check speaks only new birds (not all birds)
 - Configurable interval (default 2 minutes)
-- Auto-check is OFF by default (user must enable it)
+- Auto-check state persists in UserDefaults; it resumes automatically
+  on launch if it was running when the app was last closed, and is
+  OFF by default on a true first launch
+
+### 5. Recent Locations
+
+**Purpose**: Let the user quickly return to previously used manual
+             locations without re-searching or re-tapping the map
+
+**Flow**:
+
+  1. Every time `setManualLocation(_:name:)` is called (via search
+     result, map tap, or recent-location selection), the location is
+     recorded via `addRecentLocation(name:location:)`
+  2. Any existing entry with the same name is removed first so the
+     location moves to the front rather than duplicating
+  3. The list is capped at the 5 most recent, newest first
+  4. The list persists in UserDefaults (JSON-encoded) and reloads on
+     launch
+
+**UI Behavior** (in ChangeLocationView):
+
+  - Recent locations are shown when the search field is not focused
+  - Live search completions replace them once the field gains focus
+    and has text
+  - Tapping a recent location immediately sets it as the manual
+    location, identical to selecting a live search result
+
+**Key Components**:
+
+- `RecentLocation` struct in BirdReporterViewModel
+- `recentLocations: [RecentLocation]` persisted property
+- `addRecentLocation(name:location:)` in BirdReporterViewModel
 
 ---
 
@@ -275,6 +309,29 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
   }
 ```
 
+### RecentLocation
+```swift
+  struct RecentLocation: Codable, Identifiable
+  {
+      let name: String
+      let latitude: Double
+      let longitude: Double
+
+      var id: String
+      {
+          "\(name)_\(latitude)_\(longitude)"  // Unique ID for SwiftUI
+      }
+
+      var coordinate: CLLocationCoordinate2D
+      {
+          CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+      }
+  } // struct
+```
+
+**Note**: Up to 5 are kept, newest first, persisted as JSON in
+          UserDefaults under the `recentLocations` key.
+
 ---
 
 ## Services
@@ -296,7 +353,7 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
         latitude: Double,
        longitude: Double,
         daysBack: Int = 7,
-      maxResults: Int = 100,
+      maxResults: Int = 10,
       distanceKm: Int = 5
   ) async throws -> [BirdObservation]
 ```
@@ -304,9 +361,14 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 **Parameters**:
 
   - `lat/lng`: GPS coordinates
-  - `back`: Days back to search (default 7)
-  - `maxResults`: Maximum observations to return (100)
-  - `dist`: Search radius in kilometers (default 5)
+  - `back`: Days back to search
+  - `maxResults`: Maximum observations to return
+  - `dist`: Search radius in kilometers
+
+**Note**: The default parameter values above are rarely used in
+          practice — `BirdReporterViewModel.fetchBirds()` always calls
+          this with the user's current `daysBack`, `maxBirdsToDisplay`,
+          and `searchRadiusKm` settings explicitly.
 
 **Error Handling**:
 
@@ -371,11 +433,26 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
   // Returns deduplicated list of English voices
 ```
 
-**Speech Patterns**:
+**Note**: `SpeechService` exposes a `speakBirds(_:)` convenience method,
+          but it is currently unused — `BirdReporterViewModel` builds
+          its own speech strings (in `speakBirdsInOrder` and
+          `speakNewBirdsOnly`) and calls `speak(_:)` directly, so it
+          can include the location announcement and count/"New"
+          phrasing described below.
 
-  - **All birds new**: "New Birds,, Bird Name, Count,, ..."
-  - **Mixed new/old**: "Bird Name, Count, New,, Bird Name, Count,, ..."
-  - **No new birds**: "No new birds"
+**Speech Patterns** (built in `BirdReporterViewModel`):
+
+  - **All birds new**: "New birds found at [location],, Bird Name,
+    Count,, ..."
+  - **Mixed new/old**: "At [location],, Bird Name, Count,, Bird Name,
+    Count, New,, ..."
+  - **No new birds** (auto-check only, if "Announce 'No new birds'"
+    is enabled): "No new birds"
+
+  `[location]` is the eBird `locName` of the first bird in the
+  (sorted) list being spoken — not the user's GPS or manual location
+  name. If eBird returns zero observations, nothing is spoken (there
+  is no bird data to pull a location name from).
 
 ---
 
@@ -390,7 +467,11 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
      - App title: "Local Bird Reporter"
      - "Powered by eBird" link (opens AbouteBirdView)
      - Settings gear icon (top-right)
-     - Manual location name display (if set, in orange)
+     - Manual location name display (if set, in orange) or "Using
+       current GPS location" (secondary color)
+     - Location reset button (location.fill icon) next to the
+       location text, disabled unless a manual location is set;
+       taps `clearManualLocation()` to return to GPS mode
      - Sort mode display: "Sorted by: [mode]"
   
   2. **Status Area**
@@ -430,6 +511,8 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
   2. **Location**
   
      - Change Location button (opens ChangeLocationView)
+     - Use Current Location button (disabled in GPS mode); calls
+       `clearManualLocation()`
      - Location status display:
        - "Currently: [location name]" (if manual location set)
        - "Using manual location" (if set but no name)
@@ -452,12 +535,23 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
   6. **Distance Units**
   
      - Distance units (picker: Kilometers/Miles)
-     - Mark all birds New after moving: X km/mi (stepper, 1-100)
+     - Mark all birds New after moving: X km/mi (stepper, 1-50)
 
-  7. **eBird API**
+  7. **eBird Key**
 
-     - Secure field for API key
-     - Link to obtain API key
+     - Secure field for the eBird key (header renamed from "eBird
+       API"/"API key" to "eBird Key" for users unfamiliar with the
+       term "API"; the SecureField's own inline placeholder still
+       reads "API Key" and the UserDefaults storage key remains
+       `eBirdAPIKey` — only the user-facing section header and the
+       "Get a free eBird key" link text were changed)
+     - Link to obtain a free eBird key
+
+  8. **Reset**
+
+     - "Reset to Defaults" destructive button
+     - Confirmation dialog before calling `resetToDefaults()`
+     - Does not reset the eBird key
 
 ### ChangeLocationView
 
@@ -470,8 +564,23 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
      - Clear button (x) with auto-focus
      - Magnifying glass icon to trigger search
      - Current location icon (arrow pointing up-right)
-  
-  2. **Small Map View**
+     - Fixed light-gray box background (`Color(white: 0.9)`) with
+       fixed `.black` text — intentionally non-adaptive to dark mode,
+       since the adaptive `systemGray6` background used previously
+       turned nearly black in dark mode and made the search box
+       indistinguishable from the surrounding sheet background
+
+  2. **Recent Locations List**
+
+     - Shown below the search bar when the search field is not
+       focused and `viewModel.recentLocations` is non-empty
+     - Each row shows a clock icon and the location name
+     - Replaced by live search completions once the field gains
+       focus and has text (see Core Features → Recent Locations)
+     - Tapping a row calls `selectRecentLocation(_:)`, which behaves
+       like selecting a live search result
+
+  3. **Small Map View**
   
      - Preview map showing selected location
      - Pin annotation at selected coordinate
@@ -479,7 +588,7 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
      - Tap to open full-screen map
      - iOS 26 MapKit APIs (MKReverseGeocodingRequest)
   
-  3. **Full-Screen Map**
+  4. **Full-Screen Map**
   
      - Interactive map with pan and zoom
      - Tap anywhere to select location
@@ -487,14 +596,14 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
      - Close button (x) in top-right corner
      - Immediately sets manual location on selection
   
-  4. **Workflow**
+  5. **Workflow**
   
      - Selecting location immediately sets it (no "Go There" button)
      - "Done" button dismisses view
      - Current location icon clears manual location and returns to GPS mode
      - Dismissing returns to Settings or main view
   
-  5. **Location Modes**
+  6. **Location Modes**
   
      - **GPS Mode**: Uses current device location, updates with movement
      - **Manual Mode**: Fixed location, ignores device movement
@@ -521,7 +630,7 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 | `maxBirdsToDisplay`
 |     | Int      |   50   | Birds shown in list    |
 | `maxBirdsToSpeak`
-|     | Int      |    7   | Birds announced        |
+|     | Int      |   10   | Birds announced        |
 | `checkIntervalMinutes`
 |     | Int      |    2   | Auto-check frequency   |
 | `resetDistanceKm`
@@ -529,7 +638,7 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 | `searchRadiusKm`
 |     | Int      |    3   | eBird search radius    |
 | `daysBack`
-|     | Int      |    1   | How far back to search |
+|     | Int      |    7   | How far back to search |
 | `birdSortMode`
 |     | Codable  | .largestCount | Sorting preference   |
 | `distanceUnit`
@@ -546,17 +655,23 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 |     | Double?  |   nil  | Last reset location    |
 | `hasLaunchedBefore`
 |     | Bool     |  false | First launch flag      |
-| `manualLocationLatitude`
-|     | Double?  |   nil  | Manual location coord  |
-| `manualLocationLongitude`
-|     | Double?  |   nil  | Manual location coord  |
-| `manualLocationName`
-|     | String?  |   nil  | Manual location name   |
-| `isUsingManualLocation`
-|     | Bool     |  false | Manual location flag   |
 | `announceNoNewBirds`
 |     | Bool     |  false | Speak "No new birds"   |
+| `isAutoCheckEnabled`
+|     | Bool     |  false | Auto Check on/off; resumed automatically on launch |
+| `recentLocations`
+|     | Codable  |    []  | Up to 5 recent manual locations, newest first |
 |-----|----------|--------|------------------------|
+
+**Note**: Manual location selection itself (`manualLocation`,
+          `manualLocationName`, `isUsingManualLocation`) is
+          **in-memory only** and is not persisted — every app launch
+          starts in GPS mode. `recentLocations` exists specifically to
+          make it quick to re-select a previous manual location after
+          relaunching. `lastKnownLatitude`/`lastKnownLongitude` are
+          written during a session but always cleared (not read back)
+          on the next launch, for the same reason described under
+          Location-Based Reset.
 
 ### Computed Conversions
 
@@ -664,6 +779,9 @@ Uses audio background mode with silent audio to maintain execution:
    - Interactive map with search and tap-to-select
    - Standard and satellite/hybrid map views
    - Reverse geocoding for location names
+   - Quick re-selection from up to 5 recently used locations
+   - Session-only: resets to GPS mode on every app launch (recent
+     locations make it fast to re-pin a favorite spot afterward)
 
 ---
 
@@ -678,15 +796,19 @@ Uses AVFoundation's AVSpeechSynthesizer
   - Bird names: As provided by eBird
   - Counts: Numeric value after name
   - Separators: ",, " (double comma for natural pause)
-  - Prefix: "New Birds" when all are new
-  - Suffix: ", New" for individual new birds in mixed list
+  - Location announcement: always spoken first, using the eBird
+    `locName` of the first bird in the list
+  - Prefix: "New birds found at [location]" when all birds are new,
+    otherwise "At [location]"
+  - Suffix: ", New" for individual new birds in a mixed list
 
 **Example Speech Strings**:
 
 ```
-  "New Birds,, Wood Duck, 2,, Barn Swallow, 8,, Scissor-tailed Flycatcher, 1"
+  "New birds found at Oak Point Park,, Wood Duck, 2,, Barn Swallow, 8,, " +
+  "Scissor-tailed Flycatcher, 1"
 
-  "Wood Duck, 2,, Barn Swallow, 8, New,, Northern Cardinal, 4"
+  "At Oak Point Park,, Wood Duck, 2,, Barn Swallow, 8, New,, Northern Cardinal, 4"
 
   "No new birds"
 ```
@@ -718,12 +840,17 @@ Uses AVFoundation's AVSpeechSynthesizer
 
   - Settings and preferences
   - Seen bird IDs (as array)
-  - Last known location coordinates
+  - Last known location coordinates (written but not restored — see
+    Settings & Configuration note)
   - Saved birds (JSON encoded)
+  - Recent locations (JSON encoded, up to 5)
+  - Auto Check enabled flag
 
 **In-Memory Only**:
 
   - Current bird observations array
+  - Manual location (coordinate, name, and the flag that enables it)
+    — intentionally not persisted; resets to GPS mode every launch
   - Location manager state
   - Speech synthesizer state
   - Timer reference
@@ -745,6 +872,16 @@ Uses AVFoundation's AVSpeechSynthesizer
      - Save new last known location coordinates
      - Save cleared seen bird IDs
 
+  4. **On Manual Location Set**:
+
+     - `addRecentLocation(name:location:)` updates and re-saves
+       `recentLocations`
+
+  5. **On Auto Check Start/Stop**:
+
+     - `startAutoCheck()`/`stopAutoCheck()` immediately persist
+       `isAutoCheckEnabled`
+
 ### Restoration on Launch
 
 ```swift
@@ -760,12 +897,25 @@ Uses AVFoundation's AVSpeechSynthesizer
       {
           seenBirdIds = Set(savedIds)
       }
+
+      // Restore recent locations
+      if let savedRecentLocations = UserDefaults.standard.data(...),
+         let decodedLocations = try? JSONDecoder().decode(...)
+      {
+          recentLocations = decodedLocations
+      }
   
       // Restore last bird list
       if let savedBirdsData = UserDefaults.standard.data(...),
          let savedBirds = try? JSONDecoder().decode(...) 
       {
           birds = savedBirds
+      }
+
+      // Resume Auto Check if it was running last session
+      if UserDefaults.standard.object(forKey: "isAutoCheckEnabled") as? Bool ?? false
+      {
+          startAutoCheck()
       }
   }
 ```
@@ -788,9 +938,10 @@ Uses AVFoundation's AVSpeechSynthesizer
 
   - `lat`       : Latitude (required)
   - `lng`       : Longitude (required)
-  - `back`      : Days back (1-30, default 7)
-  - `dist`      : Distance in km (default 5)
-  - `maxResults`: Maximum results (default 100)
+  - `back`      : Days back (1-30, set from the "Show birds from
+                  last" setting)
+  - `dist`      : Distance in km (1-50, set from "Search radius")
+  - `maxResults`: Maximum results (1-50, set from "Display" setting)
 
 **Headers**:
 
@@ -877,10 +1028,26 @@ Uses AVFoundation's AVSpeechSynthesizer
 
   speakBirdsInOrder( 
       Array( birdsToSpeak.prefix( maxBirdsToSpeak ) ) )
+
+  // Inside speakBirdsInOrder: always announce the location of the
+  // first bird, prefixed with "New birds found at" if every bird in
+  // the list is new, or just "At" otherwise
+
+  let firstLocationName = birds[0].locName
+
+  if allBirdsAreNew
+  {
+      speechParts.append("New birds found at \(firstLocationName)")
+  }
+  else
+  {
+      speechParts.append("At \(firstLocationName)")
+  }
 ```
 
 **Note**: Speech and display now use the same sort order (user's selected
-          preference), ensuring consistency.
+          preference), ensuring consistency. The same location-first
+          pattern is used in `speakNewBirdsOnly` for auto-check.
 
 ### Performance Considerations
 
@@ -914,7 +1081,8 @@ Uses AVFoundation's AVSpeechSynthesizer
 
      - Shows "No birds found yet" placeholder
      - Provides instructions to fetch
-     - Doesn't speak anything
+     - Doesn't speak anything (there's no bird data to pull a
+       location name from, so even the location isn't announced)
   
   3. **API Key Invalid**:
 
@@ -937,13 +1105,56 @@ Uses AVFoundation's AVSpeechSynthesizer
   6. **Manual Location Mode**:
   
      - No distance tracking when manual location set
-     - Location persists across app launches
+     - Resets to GPS mode on every app launch (not persisted);
+       `recentLocations` lets you quickly re-pin it afterward
      - Can monitor remote locations from anywhere
      - Clear visual indicator (orange text on main view)
 
+  7. **Auto Check Across Launches**:
+
+     - State persists; resumes automatically if it was on when the
+       app was last closed
+     - On a true first launch (no saved value yet), defaults to OFF
+
 ---
 
-## Recent Updates (August 2026)
+## Recent Updates (October 2026)
+
+  1. **Recent Locations**:
+
+     - Quick-select list of the 5 most recently used manual
+       locations, persisted across launches
+     - Shown in ChangeLocationView when the search field isn't
+       focused; replaced by live search results once you start typing
+
+  2. **Dark Mode Fix**:
+
+     - ChangeLocationView's search field used an adaptive gray
+       background that turned nearly black in dark mode, making the
+       box indistinguishable from the sheet behind it
+     - Changed to a fixed light-gray background with fixed dark text,
+       readable in both appearances
+
+  3. **Spoken Location Announcements**:
+
+     - Both manual "Fetch Local Birds" and auto-check now announce
+       the observation location before the bird list, every time
+       there's something to speak — not just when all birds are new
+
+  4. **Auto Check Persistence**:
+
+     - Auto Check on/off state now persists in UserDefaults and
+       resumes automatically on the next launch if it was running
+       when the app was last closed
+
+  5. **eBird Terminology Simplified**:
+
+     - Settings section header changed from "eBird API" to
+       "eBird Key"
+     - "Get a free API key" link changed to "Get a free eBird key"
+     - Aimed at users unfamiliar with the term "API"
+
+## Previous Updates (August 2026)
 
   1. **Manual Location Selection**:
 
@@ -968,7 +1179,7 @@ Uses AVFoundation's AVSpeechSynthesizer
   
   4. **Speech Enhancements**:
 
-     - Deduplicated voice list (no duplicate names)
+     - Cleaned up voice list (no duplicate names)
      - Optional "No new birds" announcement
      - Speech can be disabled (set to 0)
      - Speech and display use same sort order
@@ -986,46 +1197,26 @@ Uses AVFoundation's AVSpeechSynthesizer
 
 ## Future Enhancement Opportunities
 
-  1. **Offline Mode**:
+  1. **Keeping Records**:
 
-     - Cache observations for offline viewing
-     - Queue API calls when network unavailable
+     - Keep an app-local list of timestamped birds and their locations for quick reference
+     - Prepare a pdf file with timestamps and active links to eBird for each bird, and Apple Maps for their locations
   
-  2. **Custom Bird Lists**:
+  2. **App Intents**
 
-     - Personal target species lists
-     - Alert only for specific birds
-  
-  3. **Historical Tracking**:
+     - Add App Intents so that Shortcuts can be created
+     - Connect the Shortcuts to Apple CarPlay
+     - Have Siri Fetch Local Birds and speak the location and birds
+     - Have Siri change some of the Settings
+     - Have Siri stop the app speaking
 
-     - Log all birds seen with timestamps
-     - Export to CSV or share
-  
-  4. **Enhanced Maps**:
+  3. **Enhanced Maps**:
 
      - Show bird observations as pins on map
      - Cluster markers for dense areas
      - Trail/hotspot overlays
+     - Have Apple Maps automatically give driving directions to a reported bird location
   
-  5. **Photos & Media**:
-
-     - Display bird photos from eBird
-     - Link to Macaulay Library
-     - Bird calls and songs
-  
-  6. **Social Features**:
-
-     - Share recent observations
-     - Connect with other birders
-     - Checklist submission to eBird
-  
-  7. **Advanced Filters**:
-
-     - Filter by rarity
-     - Show only species not yet seen
-     - Seasonal filters
-     - Life list integration
-
 ---
 
 ## Testing Recommendations
@@ -1053,6 +1244,14 @@ Uses AVFoundation's AVSpeechSynthesizer
   5. Test with poor GPS signal
   6. Test with no network connection
   7. Verify location reset at threshold
+  8. Set 6+ locations via Change Location; verify the Recent
+     Locations list caps at 5, newest first, and survives relaunch
+  9. Verify Change Location's search field is readable in both Light
+     and Dark Mode
+  10. Enable Auto Check, force-quit the app, relaunch, and verify it
+      resumes automatically
+  11. Verify spoken announcements lead with the location name on
+      both manual fetch and auto-check
 
 ### Accessibility Testing
 

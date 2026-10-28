@@ -534,7 +534,7 @@ class BirdReporterViewModel
   {
     if apiKey.isEmpty
     {
-      errorMessage = "Please add your eBird API key in Settings."
+      errorMessage = "Please add your eBird key in Settings."
       return
 
     } // if
@@ -842,8 +842,8 @@ class BirdReporterViewModel
           if let urlError = error as? URLError,
              urlError.code == .badServerResponse
           {
-            errorMessage = "Invalid API key. Please check your " +
-                           "eBird API key in Settings."
+            errorMessage = "Invalid eBird key. Please check your " +
+                           "eBird key in Settings."
 
           } // if
           else
