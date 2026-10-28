@@ -41,7 +41,27 @@ struct BirdObservation: Codable, Identifiable
   {
     "\(speciesCode)_\(locName)"
   } // locationBasedId
-  
+
+  // ------------------------------
+  // eBird appends a "(lat, lng)" coordinate pair to locName for personal
+  // (non-hotspot) locations; strip it so coordinates are never spoken
+
+  var spokenLocName: String
+  {
+    guard let range = locName.range(
+      of: #"\s*\(-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?\)\s*$"#,
+      options: .regularExpression
+    )
+    else
+    {
+      return locName
+
+    } // guard
+
+    return String(locName[..<range.lowerBound])
+
+  } // spokenLocName
+
   // ------------------------------
 
   enum CodingKeys: String, CodingKey

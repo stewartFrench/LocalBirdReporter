@@ -17,6 +17,7 @@ struct SettingsView: View
   @State private var availableVoices       : [AVSpeechSynthesisVoice] = []
   @State private var showingChangeLocation = false
   @State private var showingResetConfirmation = false
+  @FocusState private var apiKeyFieldIsFocused : Bool
 
   // ------------------------------
 
@@ -238,11 +239,12 @@ struct SettingsView: View
         )
         {
           SecureField(
-            "API Key",
+            "eBird Key",
             text: $viewModel.apiKey
           )
           .autocorrectionDisabled()
           .textInputAutocapitalization(.never)
+          .focused($apiKeyFieldIsFocused)
 
           Link(
             "Get a free eBird key",
@@ -266,6 +268,7 @@ struct SettingsView: View
             maxWidth  : .infinity,
             alignment : .center
           )
+          .disabled(apiKeyFieldIsFocused)
 
         } // Section Reset
 

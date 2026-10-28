@@ -845,6 +845,9 @@ class BirdReporterViewModel
             errorMessage = "Invalid eBird key. Please check your " +
                            "eBird key in Settings."
 
+            birds.removeAll()
+            saveBirds()
+
           } // if
           else
           {
@@ -1008,7 +1011,7 @@ class BirdReporterViewModel
             // Always announce the location of the first bird in the list,
             // with a "New birds" prefix only if all birds are new
 
-    let firstLocationName = birds[0].locName
+    let firstLocationName = birds[0].spokenLocName
 
     if allBirdsAreNew
     {
@@ -1125,7 +1128,7 @@ class BirdReporterViewModel
             // We have new birds - speak them, announcing the location
             // of the first bird in the list
 
-    let firstLocationName = birdsToSpeak[0].locName
+    let firstLocationName = birdsToSpeak[0].spokenLocName
 
     var speechParts: [String] = ["New birds found at \(firstLocationName)"]
 
