@@ -420,7 +420,7 @@ class BirdReporterViewModel
     UserDefaults.standard.removeObject(forKey: "lastKnownLatitude")
     UserDefaults.standard.removeObject(forKey: "lastKnownLongitude")
 
-            // Mark first launch (but don't enable auto-check by default)
+            // Mark first launch
 
     if UserDefaults.standard.object(forKey: "hasLaunchedBefore") == nil
     {
@@ -428,6 +428,16 @@ class BirdReporterViewModel
         true,
         forKey: "hasLaunchedBefore"
       )
+
+    } // if
+
+            // Resume auto-check if it was running last time the app launched
+
+    if UserDefaults.standard.object(
+      forKey: "isAutoCheckEnabled"
+    ) as? Bool ?? false
+    {
+      startAutoCheck()
 
     } // if
 
@@ -447,6 +457,11 @@ class BirdReporterViewModel
   {
     stopAutoCheck()
     isAutoCheckEnabled = true
+
+    UserDefaults.standard.set(
+      true,
+      forKey: "isAutoCheckEnabled"
+    )
 
             // Start silent audio to keep app active in background
 
@@ -489,6 +504,11 @@ class BirdReporterViewModel
     timer?.invalidate()
     timer = nil
     isAutoCheckEnabled = false
+
+    UserDefaults.standard.set(
+      false,
+      forKey: "isAutoCheckEnabled"
+    )
 
             // Stop silent audio when auto-check is stopped
 
@@ -985,13 +1005,21 @@ class BirdReporterViewModel
 
     var speechParts: [String] = []
 
-            // Add "New Birds" prefix if all birds are new
+            // Always announce the location of the first bird in the list,
+            // with a "New birds" prefix only if all birds are new
+
+    let firstLocationName = birds[0].locName
 
     if allBirdsAreNew
     {
-      speechParts.append("New Birds")
+      speechParts.append("New birds found at \(firstLocationName)")
 
     } // if
+    else
+    {
+      speechParts.append("At \(firstLocationName)")
+
+    } // else
 
     for bird in birds
     {
@@ -1094,9 +1122,12 @@ class BirdReporterViewModel
 
     } // if
 
-            // We have new birds - speak them
+            // We have new birds - speak them, announcing the location
+            // of the first bird in the list
 
-    var speechParts: [String] = ["New Birds"]
+    let firstLocationName = birdsToSpeak[0].locName
+
+    var speechParts: [String] = ["New birds found at \(firstLocationName)"]
 
     for bird in birdsToSpeak
     {

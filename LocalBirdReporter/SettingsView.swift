@@ -234,7 +234,7 @@ struct SettingsView: View
         } // Section Distance Units
 
         Section(
-          header: Text("eBird API")
+          header: Text("eBird Key")
         )
         {
           SecureField(
@@ -245,12 +245,12 @@ struct SettingsView: View
           .textInputAutocapitalization(.never)
 
           Link(
-            "Get a free API key",
+            "Get a free eBird key",
             destination: URL(string: "https://ebird.org/api/keygen")!
           )
           .font(.caption)
 
-        } // Section eBird API
+        } // Section eBird Key
 
         Section
         {
