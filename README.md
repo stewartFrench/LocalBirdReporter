@@ -1,7 +1,7 @@
 
 # LocalBirdReporter - Discover Birds While You Drive
 
-Local Bird Reporter is your automatic birding companion that speaks to report nearby birds as you travel.  Your iPhone can be on standby and in your pocket and LocalBirdReporter will speak to report birds through your earbuds or headphones.
+LocalBirdReporter is your automatic birding companion that speaks to report nearby birds as you travel.  Your iPhone can be on standby and in your pocket and LocalBirdReporter will speak to report birds through your earbuds or headphones.
 
 The app is smart about location changes - when you drive, bike, or walk more than a configurable distance, it automatically speaks to report birds at your new location. Perfect for birding road trips where you're visiting multiple parks or wildlife areas.
 
