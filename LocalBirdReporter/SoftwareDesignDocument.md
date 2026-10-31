@@ -4,7 +4,7 @@
 
 **Version:** 2.0
 
-**Date:** October 28, 2026
+**Date:** October 31, 2026
 
 **Author:** Stewart French, Claude Sonnet 5 by Anthropic
 
@@ -1197,20 +1197,27 @@ Uses AVFoundation's AVSpeechSynthesizer
 
 ## Future Enhancement Opportunities
 
-  1. **Keeping Records**:
+  1. **App Intents**
+
+     - Add App Intents so that Shortcuts can be created
+     - Connect the Shortcuts to Apple CarPlay
+     - Have Siri Fetch Local Birds and speak the location and birds ( "Hey Siri LocalBirdReport" )
+     - Have Siri change some of the Settings ( "Hey Siri LocalBirdReport [ expand | contract | older | newer ]"
+     - Have Siri stop the app speaking
+
+  2. eBird Key Acquisition
+
+     - Detect successful eBird signup and the "confirm your email screen"
+     - Tell the user to go click the link in their email
+     - When they come back to the app, try to load the profile page or something to see if they activated the account
+     - Load API generation page automatically, maybe even prefill the Organization Project name, and Usage description for them
+
+  3. **Keeping Records**:
 
      - Keep an app-local list of timestamped birds and their locations for quick reference
      - Prepare a pdf file with timestamps and active links to eBird for each bird, and Apple Maps for their locations
   
-  2. **App Intents**
-
-     - Add App Intents so that Shortcuts can be created
-     - Connect the Shortcuts to Apple CarPlay
-     - Have Siri Fetch Local Birds and speak the location and birds
-     - Have Siri change some of the Settings
-     - Have Siri stop the app speaking
-
-  3. **Enhanced Maps**:
+  4. **Enhanced Maps**:
 
      - Show bird observations as pins on map
      - Cluster markers for dense areas
@@ -1275,7 +1282,7 @@ Uses AVFoundation's AVSpeechSynthesizer
 
 ### Monitoring Points
 
-  - eBird API response times
+  - eBird response times
   - Location fix acquisition time
   - Background execution duration
   - Speech synthesis completion
