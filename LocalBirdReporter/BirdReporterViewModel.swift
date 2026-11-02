@@ -492,6 +492,13 @@ class BirdReporterViewModel
 
     } // if
 
+            // A fresh install/rebuild can leave Siri's App Shortcuts
+            // index stale relative to the current favorites, so force
+            // a re-extraction on every launch rather than waiting for
+            // the next favorite/shortcut-name edit to trigger one
+
+    LocalBirdReporterShortcuts.updateAppShortcutParameters()
+
   } // init
 
   // ------------------------------
