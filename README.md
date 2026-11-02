@@ -103,6 +103,8 @@ When I say
   - "Hey Siri, LocalBirdReporter longer" to increase the Setting "Show birds from last:" by 1 day
   - "Hey Siri, LocalBirdReporter shorter" to decrease the Setting "Show birds from last:" by 1 day
 
+  - "Hey Siri, LocalBirdReporter settings" to speak the important settings
+
   - "Hey Siri, LocalBirdReporter here" to set location to current GPS coordinates and speak a bird report from there
   - "Hey Siri, LocalBirdReporter <favoriteLocation>" to set the location and speak a bird report from there
 

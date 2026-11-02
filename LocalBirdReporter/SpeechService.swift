@@ -87,7 +87,19 @@ class SpeechService
     } // else
 
     utterance.rate = 0.5
-    synthesizer.speak(utterance)
+
+            // Give the audio route a moment to engage before speaking.
+            // Without this, the first word is sometimes clipped - most
+            // noticeable on a cold app launch triggered by Siri, where
+            // the audio session has never been activated before
+
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2)
+    {
+      [weak self] in
+
+      self?.synthesizer.speak(utterance)
+
+    } // asyncAfter
   } // speak
 
   // ------------------------------

@@ -349,6 +349,64 @@ struct FetchBirdsHereIntent: AppIntent
 } // struct FetchBirdsHereIntent
 
 // ----------------------------------------
+// Siri phrase: "Hey Siri, LocalBirdReporter settings"
+// Speaks a quick summary of the settings that most affect what a
+// fetch returns, via Siri's own dialog rather than the app's speech
+
+struct ReportSettingsIntent: AppIntent
+{
+  static let title: LocalizedStringResource = "Report Current Settings"
+
+  // ------------------------------
+  // Run headlessly - no need to bring the app to the foreground
+
+  static var supportedModes: IntentModes
+  {
+    .background
+
+  } // supportedModes
+
+  // ------------------------------
+
+  @MainActor
+  func perform() async throws -> some IntentResult & ProvidesDialog
+  {
+    let viewModel = BirdReporterViewModel.shared
+
+    let radiusText: String
+
+    if viewModel.distanceUnit == .miles
+    {
+      let miles = Int(Double(viewModel.searchRadiusKm) / 1.60934)
+      radiusText = "\(miles) miles"
+
+    } // if
+    else
+    {
+      radiusText = "\(viewModel.searchRadiusKm) kilometers"
+
+    } // else
+
+    let autoCheckText = viewModel.isAutoCheckEnabled
+      ? "Auto Check is on, every \(viewModel.checkIntervalMinutes) minutes"
+      : "Auto Check is off"
+
+    let locationText = viewModel.isUsingManualLocation
+      ? "Using \(viewModel.manualLocationName ?? "a manual location")"
+      : "Using your current GPS location"
+
+    return .result(
+      dialog: """
+      Search radius is \(radiusText). Showing birds from the last \
+      \(viewModel.daysBack) days. \(autoCheckText). \(locationText).
+      """
+    )
+
+  } // perform
+
+} // struct ReportSettingsIntent
+
+// ----------------------------------------
 
 struct LocalBirdReporterShortcuts: AppShortcutsProvider
 {
@@ -388,6 +446,15 @@ struct LocalBirdReporterShortcuts: AppShortcutsProvider
       ],
       shortTitle       : "Fetch Birds Here",
       systemImageName  : "location.fill"
+    )
+
+    AppShortcut(
+      intent           : ReportSettingsIntent(),
+      phrases          : [
+        "\(.applicationName) settings"
+      ],
+      shortTitle       : "Report Current Settings",
+      systemImageName  : "gearshape"
     )
 
   } // appShortcuts
