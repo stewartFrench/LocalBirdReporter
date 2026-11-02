@@ -7,9 +7,5 @@
 		<string>audio</string>
 		<string>location</string>
 	</array>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Local Bird Reporter needs your location to find nearby bird observations from eBird.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Local Bird Reporter needs continuous access to your location to automatically check for new birds as you move to different areas, even when the app is in the background.</string>
 </dict>
 </plist>

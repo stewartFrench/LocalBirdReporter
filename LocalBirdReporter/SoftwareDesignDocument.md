@@ -4,7 +4,7 @@
 
 **Version:** 2.0
 
-**Date:** October 31, 2026
+**Date:** November 2, 2026
 
 **Author:** Stewart French, Claude Sonnet 5 by Anthropic
 
@@ -41,12 +41,19 @@ and maintains awareness of location changes.
     
   - Supports an interactive map with satellite view for location selection
 
-  - Supports quick re-selection from up to 5 recent locations
-    
+  - Supports quick re-selection from up to 10 recent locations, plus
+    an unlimited number of favorited ("starred") locations that are
+    never evicted by that cap
+
+  - Supports Siri/App Intents voice control: start or stop a report,
+    jump to a favorited location by name, jump to current GPS
+    location, and adjust search radius or days-back, all by voice
+
   - Automatically checks for new birds at configurable intervals; this
     setting persists and resumes automatically on the next launch
 
-  - Speaks the observation location, then bird names and counts
+  - Speaks the observation location (never raw GPS coordinates), then
+    bird names and counts
 
   - Tracks which birds have been "seen" and speaks any new bird observations
 
@@ -58,7 +65,7 @@ and maintains awareness of location changes.
 
 ### Target Platform
 
-- iOS 17.0+
+- iOS 26+
 - iPhone (primary), iPad (supported)
 - SwiftUI-based interface
 
@@ -71,19 +78,20 @@ and maintains awareness of location changes.
 The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 
 ```
-┌─────────────────────┐
-│     Views           │  SwiftUI Views
-│  ContentView        │  - Main bird list
-│  SettingsView       │  - Configuration UI
-│  ChangeLocationView │  - Map-based location picker
-│  AbouteBirdView     │  - Information screen
-└────────┬────────────┘
-         │
-         ▼
+┌─────────────────────┐   ┌────────────────────────────┐
+│     Views           │   │      App Intents           │  Siri entry point
+│  ContentView        │   │  FetchBirdsIntent          │
+│  SettingsView       │   │  AdjustSettingIntent       │
+│  ChangeLocationView │   │  FetchBirdsAtLocationIntent│
+│  AbouteBirdView     │   │  FetchBirdsHereIntent      │
+└────────┬────────────┘   └────────────┬───────────────┘
+         │                             │
+         └──────────────┬──────────────┘
+                        ▼
 ┌─────────────────────────────┐
 │       ViewModel             │  @Observable
 │  BirdReporterViewModel      │  - Business logic
-│                             │  - State management
+│  (.shared singleton)        │  - State management
 │                             │  - Coordinates services
 └────────┬────────────────────┘
          │
@@ -101,7 +109,8 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 │  - BirdObservation          │  Data structures
 │  - BirdSortMode             │  Enums
 │  - DistanceUnit             │
-│  - RecentLocation           │  Quick-select location history
+│  - RecentLocation           │  Favoritable location history
+│  - FavoriteLocationEntity   │  AppEntity for Siri phrases
 └─────────────────────────────┘
 ```
 
@@ -121,6 +130,11 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
      
   5. **Background Audio**: Uses silent audio playback to maintain
      background operation
+
+  6. **Shared ViewModel Singleton**: `BirdReporterViewModel.shared` lets
+     App Intents act on the same live state (settings, `isSpeaking`,
+     `recentLocations`) as the running UI, rather than a disconnected
+     copy. `ContentView` holds a reference to the same shared instance
 
 ---
 
@@ -227,10 +241,12 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
   on launch if it was running when the app was last closed, and is
   OFF by default on a true first launch
 
-### 5. Recent Locations
+### 5. Recent Locations & Favorites
 
 **Purpose**: Let the user quickly return to previously used manual
-             locations without re-searching or re-tapping the map
+             locations without re-searching or re-tapping the map,
+             and let specific locations persist indefinitely so they
+             can be attached to a stable Siri voice phrase
 
 **Flow**:
 
@@ -238,10 +254,49 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
      result, map tap, or recent-location selection), the location is
      recorded via `addRecentLocation(name:location:)`
   2. Any existing entry with the same name is removed first so the
-     location moves to the front rather than duplicating
-  3. The list is capped at the 5 most recent, newest first
+     location moves to the front rather than duplicating; its
+     `isFavorite` and `siriShortcutName` are carried forward onto the
+     new entry so re-selecting a location (by hand or via Siri) never
+     silently erases either
+  3. `trimRecentLocations()` then keeps at most 10 *non-favorite*
+     entries, newest first — favorited entries are exempt from this
+     cap and are never evicted, no matter how many temporary
+     locations get visited afterward
   4. The list persists in UserDefaults (JSON-encoded) and reloads on
      launch
+
+**Favorites** (the star button on each row):
+
+  - `toggleFavoriteLocation(_:)` flips `isFavorite` on a saved entry,
+    re-applies `trimRecentLocations()`, and calls
+    `LocalBirdReporterShortcuts.updateAppShortcutParameters()` so Siri
+    re-indexes immediately
+  - Only favorited locations are exposed to Siri (see App Intents
+    below) — the non-favorite recent list churns too often to make a
+    stable voice-phrase set
+
+**Siri Shortcut Names** (the ⓘ button, shown only on favorited rows):
+
+  - Tapping it opens an alert (pre-filled with the current shortcut
+    name, or the full name if none is set) to type a shorter,
+    voice-friendlier name — e.g. "Hagerman" instead of "Hagerman
+    National Wildlife Refuge"
+  - `setSiriShortcutName(_:for:)` stores it as `siriShortcutName` on
+    the matching `RecentLocation` (blank input clears it back to the
+    full name) and calls `updateAppShortcutParameters()`
+  - `RecentLocation.siriName` resolves to `siriShortcutName ?? name` —
+    this is what gets interpolated into the indexed Siri phrase; the
+    full `name` is unaffected and still used for display and for
+    `setManualLocation`
+  - Siri's matching of a custom per-app entity name is fairly literal,
+    not fuzzy like a built-in domain (Music, Maps) — a short, memorable
+    name works noticeably better than hoping a partial match on the
+    full name resolves. It can also lose to Siri's own knowledge-base
+    recognition if the chosen name collides with a well-known public
+    figure or place (observed with "Bob Woodruff" matching the ABC
+    News correspondent); picking a more distinctive name works around
+    this, since there's no API for an app to out-prioritize Siri's own
+    entity recognition
 
 **UI Behavior** (in ChangeLocationView):
 
@@ -255,7 +310,55 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 
 - `RecentLocation` struct in BirdReporterViewModel
 - `recentLocations: [RecentLocation]` persisted property
-- `addRecentLocation(name:location:)` in BirdReporterViewModel
+- `addRecentLocation(name:location:)`, `toggleFavoriteLocation(_:)`,
+  `setSiriShortcutName(_:for:)`, `trimRecentLocations()` in
+  BirdReporterViewModel
+
+### 6. App Intents / Siri Voice Control
+
+**Purpose**: Let Siri run core actions by voice without opening the app
+
+**Setup**: All phrases include `\(.applicationName)` (the app's actual
+          display name, "LocalBirdReporter") per App Shortcuts
+          requirements — defined in `LocalBirdReporterIntents.swift`,
+          compiled directly into the main app target (no separate App
+          Intents extension), so intents run in the same process as
+          the running app and share its live `BirdReporterViewModel`
+
+**Intents** (all run `supportedModes: .background` — no UI is shown):
+
+  1. **`FetchBirdsIntent`** — phrase: "Hey Siri, LocalBirdReporter".
+     If `isSpeaking`, stops speaking; otherwise calls `fetchBirds()`
+     exactly as the "Fetch Local Birds" button does (so Auto Check's
+     on/off state is never touched by this)
+
+  2. **`AdjustSettingIntent`** — phrase: "Hey Siri, LocalBirdReporter
+     widen/narrow/longer/shorter". One `AppEnum` (`SettingAdjustment`)
+     parameter expands into all four phrases from a single template.
+     `widen`/`narrow` adjust `searchRadiusKm` by 1 (clamped 1...50);
+     `longer`/`shorter` adjust `daysBack` by 1 (clamped 1...30). Each
+     returns a spoken dialog confirmation (e.g. "Search radius is now
+     6 kilometers"), converting to miles for display if that's the
+     user's unit
+
+  3. **`FetchBirdsAtLocationIntent`** — phrase: "Hey Siri,
+     LocalBirdReporter \<favorite location name\>". Takes a
+     `FavoriteLocationEntity` parameter, backed by `FavoriteLocationQuery`
+     (an `EntityQuery` scoped to `recentLocations.filter { $0.isFavorite }`,
+     implementing both `entities(for:)` and `suggestedEntities()` so
+     the Shortcuts-app picker isn't empty). If `isSpeaking`, stops;
+     otherwise calls `setManualLocation(name:location:)` for that
+     location then `fetchBirds()`
+
+  4. **`FetchBirdsHereIntent`** — phrase: "Hey Siri, LocalBirdReporter
+     here". If `isSpeaking`, stops; otherwise calls
+     `clearManualLocation()` (switch to GPS) then `fetchBirds()`
+
+**`LocalBirdReporterShortcuts`**: the `AppShortcutsProvider` registering
+  all four as zero-setup App Shortcuts (4 of the 10-shortcut-per-app
+  cap). `updateAppShortcutParameters()` must be called whenever the
+  favorited-location set or a shortcut name changes, or Siri keeps
+  matching against a stale snapshot
 
 ---
 
@@ -284,8 +387,24 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
       {
           "\(speciesCode)_\(locName)" // For tracking "seen" birds
       }
+
+      var spokenLocName: String
+      {
+          // Strips a trailing "lat, lng" coordinate pair (with or
+          // without parentheses) that eBird appends to locName for
+          // personal (non-hotspot) locations, so coordinates are
+          // never spoken
+      }
   } // struct
 ```
+
+**Note**: eBird returns raw coordinates appended to `locName` for
+          personal/non-hotspot observation locations — sometimes
+          parenthesized ("Name (32.97, -96.72)"), sometimes not
+          ("Name, City US-TX 32.97, -96.72"). `spokenLocName` strips
+          either form via regex before the name is ever passed to
+          speech. Display (the blue location line in the bird list)
+          still shows the raw, unstripped `locName`.
 
 ### BirdSortMode
 ```swift
@@ -316,6 +435,8 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
       let name: String
       let latitude: Double
       let longitude: Double
+      var isFavorite: Bool
+      var siriShortcutName: String?     // nil = use full name for Siri
 
       var id: String
       {
@@ -326,11 +447,31 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
       {
           CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
       }
+
+      var siriName: String
+      {
+          siriShortcutName ?? name   // What Siri actually matches against
+      }
   } // struct
 ```
 
-**Note**: Up to 5 are kept, newest first, persisted as JSON in
-          UserDefaults under the `recentLocations` key.
+**Note**: Up to 10 non-favorite entries are kept, newest first;
+          favorited entries are never evicted by that cap. Persisted
+          as JSON in UserDefaults under the `recentLocations` key.
+          Custom `Decodable` decoding (`decodeIfPresent` for
+          `isFavorite`/`siriShortcutName`) lets entries saved before
+          either field existed decode with `false`/`nil` instead of
+          failing.
+
+### FavoriteLocationEntity
+
+An `AppEntity` (in `LocalBirdReporterIntents.swift`) wrapping a
+favorited `RecentLocation` for use as a Siri-matchable parameter. Its
+`displayRepresentation` uses `siriName` (the shortcut name, falling
+back to the full name) — that's the string actually baked into the
+indexed Siri phrase, not the full location name. Backed by
+`FavoriteLocationQuery: EntityQuery`, scoped to
+`recentLocations.filter { $0.isFavorite }`.
 
 ---
 
@@ -372,7 +513,12 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 
 **Error Handling**:
 
-  - Invalid API key: Shows user-friendly error message
+  - Invalid eBird key: Shows user-friendly error message ("Invalid
+    eBird key...") and clears the displayed bird list via
+    `birds.removeAll()` — previously the stale list from before the
+    key went bad stayed on screen with no visible error, because
+    the status area checked `distanceMessage` before `errorMessage`
+    (now fixed: error takes priority)
   - Network errors: Displays error text
   - Bad responses: URLError.badServerResponse
 
@@ -449,10 +595,11 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
   - **No new birds** (auto-check only, if "Announce 'No new birds'"
     is enabled): "No new birds"
 
-  `[location]` is the eBird `locName` of the first bird in the
-  (sorted) list being spoken — not the user's GPS or manual location
-  name. If eBird returns zero observations, nothing is spoken (there
-  is no bird data to pull a location name from).
+  `[location]` is the `spokenLocName` (coordinate-stripped, see
+  BirdObservation above) of the first bird in the (sorted) list being
+  spoken — not the user's GPS or manual location name. If eBird
+  returns zero observations, nothing is spoken (there is no bird data
+  to pull a location name from).
 
 ---
 
@@ -477,8 +624,10 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
   2. **Status Area**
 
      - Loading indicator when fetching
+     - Error messages in red — checked *before* the distance message,
+       so a failed fetch (e.g. invalid eBird key) is never masked by
+       a leftover "Moved X.X km" message
      - Distance message: "Moved X.X km (< Y km threshold)"
-     - Error messages in red
      - Fixed height: 44pt
   
   3. **Bird List**
@@ -539,13 +688,14 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 
   7. **eBird Key**
 
-     - Secure field for the eBird key (header renamed from "eBird
-       API"/"API key" to "eBird Key" for users unfamiliar with the
-       term "API"; the SecureField's own inline placeholder still
-       reads "API Key" and the UserDefaults storage key remains
-       `eBirdAPIKey` — only the user-facing section header and the
-       "Get a free eBird key" link text were changed)
+     - Secure field for the eBird key — both the section header and
+       the SecureField's own inline placeholder read "eBird Key" (no
+       "API" wording anywhere user-facing); the UserDefaults storage
+       key remains `eBirdAPIKey` internally
      - Link to obtain a free eBird key
+     - "Reset to Defaults" below is disabled and dimmed while this
+       field has keyboard focus (`@FocusState`), so it can't be
+       tapped accidentally right after entering a new key
 
   8. **Reset**
 
@@ -573,21 +723,32 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
   2. **Recent Locations List**
 
      - Shown below the search bar when the search field is not
-       focused and `viewModel.recentLocations` is non-empty
-     - Each row shows a clock icon and the location name
+       focused and `viewModel.recentLocations` is non-empty — this is
+       the primary content of the view now that the inline map
+       preview has been removed (see "View on Map button" below), so
+       its `List` frame height was expanded from 150pt to 350pt
+     - Each row has three tappable elements: a star button (toggles
+       `isFavorite`, filled yellow when favorited), the clock-icon
+       name button (calls `selectRecentLocation(_:)`, same as
+       selecting a live search result), and — only on favorited
+       rows — a trailing ⓘ button that opens the Siri Shortcut Name
+       alert (see Core Features → Recent Locations & Favorites)
      - Replaced by live search completions once the field gains
-       focus and has text (see Core Features → Recent Locations)
-     - Tapping a row calls `selectRecentLocation(_:)`, which behaves
-       like selecting a live search result
+       focus and has text
 
-  3. **Small Map View**
-  
-     - Preview map showing selected location
-     - Pin annotation at selected coordinate
-     - Map type toggle (standard/satellite hybrid)
-     - Tap to open full-screen map
-     - iOS 26 MapKit APIs (MKReverseGeocodingRequest)
-  
+  3. **View on Map button**
+
+     - Positioned just above the "Done" button, below a flexible
+       `Spacer()` (so it stays pinned near the bottom even when the
+       lists above are short or empty)
+     - Replaces the old always-visible small map preview — tapping it
+       sets `showingFullScreenMap = true`, opening the same
+       full-screen map sheet described below; map interaction itself
+       is unchanged, it's just no longer shown inline by default
+     - The now-unused `TappableMapView` (the small preview's
+       `UIViewRepresentable` + `Coordinator`) was removed along with
+       the inline preview
+
   4. **Full-Screen Map**
   
      - Interactive map with pan and zoom
@@ -595,6 +756,7 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
      - Map type toggle button
      - Close button (x) in top-right corner
      - Immediately sets manual location on selection
+     - iOS 26 MapKit APIs (MKReverseGeocodingRequest)
   
   5. **Workflow**
   
@@ -647,8 +809,6 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 |     | String?  |   nil  | TTS voice              |
 | `seenBirdIds`
 |     | [String] |    []  | Tracked bird IDs       |
-| `savedBirds`
-|     | Codable  |    []  | Last bird list         |
 | `lastKnownLatitude`
 |     | Double?  |   nil  | Last reset location    |
 | `lastKnownLongitude`
@@ -660,7 +820,7 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
 | `isAutoCheckEnabled`
 |     | Bool     |  false | Auto Check on/off; resumed automatically on launch |
 | `recentLocations`
-|     | Codable  |    []  | Up to 5 recent manual locations, newest first |
+|     | Codable  |    []  | Up to 10 non-favorite + unlimited favorited manual locations, newest first |
 |-----|----------|--------|------------------------|
 
 **Note**: Manual location selection itself (`manualLocation`,
@@ -671,7 +831,11 @@ The app follows the MVVM (Model-View-ViewModel) architecture pattern:
           relaunching. `lastKnownLatitude`/`lastKnownLongitude` are
           written during a session but always cleared (not read back)
           on the next launch, for the same reason described under
-          Location-Based Reset.
+          Location-Based Reset. The displayed bird list (`birds`) is
+          likewise **not persisted** — it intentionally no longer
+          survives a relaunch (see Data Persistence below); only
+          `seenBirdIds` (which birds have already been reported)
+          persists.
 
 ### Computed Conversions
 
@@ -779,7 +943,8 @@ Uses audio background mode with silent audio to maintain execution:
    - Interactive map with search and tap-to-select
    - Standard and satellite/hybrid map views
    - Reverse geocoding for location names
-   - Quick re-selection from up to 5 recently used locations
+   - Quick re-selection from up to 10 recently used locations, plus
+     any number of favorited locations
    - Session-only: resets to GPS mode on every app launch (recent
      locations make it fast to re-pin a favorite spot afterward)
 
@@ -796,8 +961,8 @@ Uses AVFoundation's AVSpeechSynthesizer
   - Bird names: As provided by eBird
   - Counts: Numeric value after name
   - Separators: ",, " (double comma for natural pause)
-  - Location announcement: always spoken first, using the eBird
-    `locName` of the first bird in the list
+  - Location announcement: always spoken first, using the
+    coordinate-stripped `spokenLocName` of the first bird in the list
   - Prefix: "New birds found at [location]" when all birds are new,
     otherwise "At [location]"
   - Suffix: ", New" for individual new birds in a mixed list
@@ -842,13 +1007,19 @@ Uses AVFoundation's AVSpeechSynthesizer
   - Seen bird IDs (as array)
   - Last known location coordinates (written but not restored — see
     Settings & Configuration note)
-  - Saved birds (JSON encoded)
-  - Recent locations (JSON encoded, up to 5)
+  - Recent locations (JSON encoded, up to 10 non-favorite + unlimited
+    favorited, including each one's `isFavorite`/`siriShortcutName`)
   - Auto Check enabled flag
 
 **In-Memory Only**:
 
-  - Current bird observations array
+  - Current bird observations array (`birds`) — **intentionally not
+    persisted**; every launch starts with an empty list rather than
+    showing whatever was on screen when the app was last force-quit
+    (previously `saveBirds()`/`savedBirds` persisted and restored
+    this; both were removed, along with the five call sites that
+    wrote to it, since nothing read it back anymore once launch
+    restoration was removed)
   - Manual location (coordinate, name, and the flag that enables it)
     — intentionally not persisted; resets to GPS mode every launch
   - Location manager state
@@ -859,7 +1030,6 @@ Uses AVFoundation's AVSpeechSynthesizer
 
   1. **After Each Fetch**:
   
-     - `saveBirds()` - Encode and store bird array
      - `saveSeenBirdIds()` - Convert set to array and store
   
   2. **On Setting Changes**:
@@ -875,12 +1045,20 @@ Uses AVFoundation's AVSpeechSynthesizer
   4. **On Manual Location Set**:
 
      - `addRecentLocation(name:location:)` updates and re-saves
-       `recentLocations`
+       `recentLocations`, preserving `isFavorite`/`siriShortcutName`
+       from any existing entry with the same name
 
   5. **On Auto Check Start/Stop**:
 
      - `startAutoCheck()`/`stopAutoCheck()` immediately persist
        `isAutoCheckEnabled`
+
+  6. **On Favorite Toggle / Shortcut Name Change**:
+
+     - `toggleFavoriteLocation(_:)` and `setSiriShortcutName(_:for:)`
+       re-save `recentLocations` and call
+       `LocalBirdReporterShortcuts.updateAppShortcutParameters()` so
+       Siri re-indexes immediately
 
 ### Restoration on Launch
 
@@ -904,13 +1082,9 @@ Uses AVFoundation's AVSpeechSynthesizer
       {
           recentLocations = decodedLocations
       }
-  
-      // Restore last bird list
-      if let savedBirdsData = UserDefaults.standard.data(...),
-         let savedBirds = try? JSONDecoder().decode(...) 
-      {
-          birds = savedBirds
-      }
+
+      // Note: the bird list is NOT restored here - every launch
+      // starts with an empty `birds` array (see In-Memory Only above)
 
       // Resume Auto Check if it was running last session
       if UserDefaults.standard.object(forKey: "isAutoCheckEnabled") as? Bool ?? false
@@ -1033,7 +1207,7 @@ Uses AVFoundation's AVSpeechSynthesizer
   // first bird, prefixed with "New birds found at" if every bird in
   // the list is new, or just "At" otherwise
 
-  let firstLocationName = birds[0].locName
+  let firstLocationName = birds[0].spokenLocName
 
   if allBirdsAreNew
   {
@@ -1084,9 +1258,11 @@ Uses AVFoundation's AVSpeechSynthesizer
      - Doesn't speak anything (there's no bird data to pull a
        location name from, so even the location isn't announced)
   
-  3. **API Key Invalid**:
+  3. **eBird Key Invalid**:
 
-     - User-friendly error message
+     - User-friendly error message ("Invalid eBird key...")
+     - Clears the displayed bird list (`birds.removeAll()`) so stale
+       results don't linger alongside the error
      - Directs to Settings to update key
      - Doesn't expose technical details
   
@@ -1118,7 +1294,79 @@ Uses AVFoundation's AVSpeechSynthesizer
 
 ---
 
-## Recent Updates (October 2026)
+## Recent Updates (November 2026)
+
+  1. **App Intents / Siri Voice Control**:
+
+     - Four zero-setup App Shortcuts added: start/stop a bird report
+       ("Hey Siri, LocalBirdReporter"), widen/narrow/longer/shorter
+       search-setting adjustments with spoken confirmation, jump to a
+       favorited location by name, and jump to current GPS location
+       ("...here")
+     - `BirdReporterViewModel.shared` singleton added so intents share
+       the running app's live state instead of a disconnected copy
+     - See Core Features → App Intents / Siri Voice Control for details
+
+  2. **Favorites & Siri Shortcut Names**:
+
+     - Recent-locations cap raised from 5 to 10, and favorited
+       ("starred") locations are now exempt from that cap entirely —
+       they persist until unfavorited, specifically so they can be
+       attached to a stable Siri phrase even while temporary locations
+       churn through the capped list
+     - Each favorited location can have a short "Siri shortcut name"
+       set via a new ⓘ button, since Siri's matching on a custom
+       per-app entity is fairly literal (not fuzzy like Music/Maps) —
+       a full name like "Hagerman National Wildlife Refuge" often
+       doesn't resolve from a short spoken phrase, but a registered
+       short name does
+     - Fixed a data-loss bug where re-selecting a location (by hand
+       or via its own Siri shortcut) silently reset its favorite
+       status and shortcut name, because `addRecentLocation` rebuilt
+       the entry from scratch instead of preserving both fields
+
+  3. **ChangeLocationView Redesign**:
+
+     - Removed the always-visible inline map preview; replaced with a
+       "View on Map" button (pinned just above "Done") that opens the
+       same full-screen map as before — map interaction itself is
+       unchanged
+     - Recent Locations list expanded from 150pt to 350pt tall, since
+       it's now the primary content of the view
+
+  4. **Bird List No Longer Persisted Across Launches**:
+
+     - Previously the last-fetched bird list was saved and restored
+       on next launch; now every launch starts with an empty list,
+       matching how "seen" tracking and manual location already work
+     - `saveBirds()`/`savedBirds` and all five call sites removed
+
+  5. **GPS Coordinates Never Spoken**:
+
+     - eBird appends raw coordinates to `locName` for personal
+       (non-hotspot) observation locations, with or without
+       parentheses — `BirdObservation.spokenLocName` strips either
+       form via regex before speech, so coordinates are never
+       announced
+
+  6. **Error Message Visibility Fix**:
+
+     - The status area checked `distanceMessage` before
+       `errorMessage`, so a failed fetch (e.g. invalid key) silently
+       showed stale distance text instead of the error. Error now
+       takes priority
+
+  7. **"eBird Key" Wording Completed**:
+
+     - The SecureField's own inline placeholder (previously still
+       "API Key" despite the section header already saying "eBird
+       Key") now also reads "eBird Key," and error messages say
+       "Invalid eBird key" instead of "Invalid API key"
+     - "Reset to Defaults" is disabled/dimmed while the eBird Key
+       field has focus, to prevent an accidental tap right after
+       entering a new key
+
+## Previous Updates (October 2026)
 
   1. **Recent Locations**:
 
@@ -1197,13 +1445,12 @@ Uses AVFoundation's AVSpeechSynthesizer
 
 ## Future Enhancement Opportunities
 
-  1. **App Intents**
+  1. **App Intents Follow-Ons**
 
-     - Add App Intents so that Shortcuts can be created
      - Connect the Shortcuts to Apple CarPlay
-     - Have Siri Fetch Local Birds and speak the location and birds ( "Hey Siri LocalBirdReport" )
-     - Have Siri change some of the Settings ( "Hey Siri LocalBirdReport [ expand | contract | older | newer ]"
-     - Have Siri stop the app speaking
+     - Have Siri change more Settings beyond search radius/days-back
+     - A way to let Siri disambiguate or list available favorited
+       locations by voice ("What locations do I have saved?")
 
   2. eBird Key Acquisition
 
@@ -1251,14 +1498,29 @@ Uses AVFoundation's AVSpeechSynthesizer
   5. Test with poor GPS signal
   6. Test with no network connection
   7. Verify location reset at threshold
-  8. Set 6+ locations via Change Location; verify the Recent
-     Locations list caps at 5, newest first, and survives relaunch
+  8. Set 11+ non-favorite locations via Change Location; verify the
+     Recent Locations list caps at 10, newest first, and survives
+     relaunch — then favorite one near the cap boundary and verify it
+     is never evicted regardless of how many more locations are added
   9. Verify Change Location's search field is readable in both Light
      and Dark Mode
   10. Enable Auto Check, force-quit the app, relaunch, and verify it
       resumes automatically
   11. Verify spoken announcements lead with the location name on
-      both manual fetch and auto-check
+      both manual fetch and auto-check, and that raw GPS coordinates
+      are never spoken for a personal (non-hotspot) eBird location
+  12. Force-quit the app after a fetch with birds displayed; relaunch
+      and verify the bird list starts empty (not restored)
+  13. Favorite a location, set a Siri shortcut name via the ⓘ button,
+      then re-select that location (by tapping it, or via its own
+      Siri phrase) and verify the shortcut name is still set
+      afterward — this previously got silently wiped
+  14. Test each App Intent via Siri: "Hey Siri, LocalBirdReporter"
+      (start, then say it again mid-speech to verify it stops),
+      "...widen"/"narrow"/"longer"/"shorter" (verify spoken
+      confirmation), "...\<favorited shortcut name\>", and "...here"
+  15. Verify the ⓘ shortcut-name button only appears on favorited
+      (starred) rows, not on plain recent ones
 
 ### Accessibility Testing
 

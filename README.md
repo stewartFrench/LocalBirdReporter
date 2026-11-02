@@ -7,7 +7,7 @@ The app is smart about location changes - when you drive, bike, or walk more tha
 
 When you run LocalBirdReporter on your iPhone and tap "Fetch Local Birds" the app automatically checks eBird for recent bird sightings in your area and speaks to report them.  If "Auto Check" is set then LocalBirdReporter will periodically check if you have moved to a new location and speaks to report new birds in that location.
 
-You can also manually select and monitor specific locations. Pick a wildlife refuge, park, or birding hotspot on the map and get spoken reports of birds reported there - even when you're miles away.
+You can also manually select and monitor specific locations. Select a wildlife refuge, park, or birding hotspot and get spoken reports of birds reported there - even when you're miles away.
 
 Some observations are so exciting you'll want to pull over and try to spot them yourself! The app provides direct links to eBird species pages and link to Apple maps for the observation locations.  Just tap the bird name to get directed to eBird, or tap the location to get directed to that spot in Apple Maps.
 
@@ -18,7 +18,7 @@ Some observations are so exciting you'll want to pull over and try to spot them 
 1. **Obtain an eBird Key**
 
    - Visit <https://ebird.org/api/keygen>
-   - Request a free eBird key.  This requires an eBird account.  An account does not cost anything and gives you access to all the Cornell Labs projects.
+   - Request a free eBird key.  This requires an eBird account.  An account does not cost anything and gives you access to all the Cornell Lab of Ornithology projects.
    - Copy your eBird key
 
 2. **Configure the App**
@@ -40,7 +40,7 @@ Some observations are so exciting you'll want to pull over and try to spot them 
      | Max birds to speak       |   10 (set to zero turns off speaking) |
      | Voice                    |   system |
      | Distance unit            |   kilometers |
-     | Auto check               |   Off |
+     | Auto Check               |   Off |
      | Manual Location          |   GPS |
 
 3. **Grant Permissions**
@@ -80,13 +80,37 @@ Some observations are so exciting you'll want to pull over and try to spot them 
 > Also in Settings, I can change "Show birds from last:" to a longer time, say, 7 days, or 14 days.   
 > Now, even with a smaller "Search Radius" I can tap "Fetch Local Birds" and possibly turn up some birds.   
 
-**Monitor a Hotspot**: Select a local wildlife refuge on the map and see what interesting birds have been reported there.
+**Monitor a Hotspot**: Select a local wildlife refuge and see what interesting birds have been reported there.
 
 **Park Hopping**: Visit multiple parks in a day. The app speaks to report birds at each new location.
 
 **Hands-Free Birding**: Put on your earbuds or earphones and LocalBirdReporter will speak to report birds. No need to look at your phone.  Keep it in your pocket while you use your camera or binoculars.
 
 **Sort By**: The default is to show you the birds sorted by "Largest Number" (biggest flocks first) but you can change this.  Tap Settings and notice "Sort By".  Here you can change it to "Closest", "Most Recently Reported" or "Largest Number".  LocalBirdReporter will remember your settings for next time you run the app.
+
+
+-----------------------------------------------
+## Siri and Shortcuts
+
+**LocalBirdReporter supports Shortcuts and Siri**
+
+LocalBirdReporter works with Siri.
+When I say
+"Hey Siri, LocalBirdReporter" it is like tapping the button "Fetch Local Birds".  It speaks a bird report with the current settings.  If I say it again it immediately stops speaking.  A one time Siri invocation of LocalBirdReporter won't turn Auto Check on.  If Auto Check was already running in the background it will continue to run after the Siri invocation.
+
+  - "Hey Siri, LocalBirdReporter widen"  to increase the search radius by 1 km
+  - "Hey Siri, LocalBirdReporter narrow" to decrease the search radius by 1 km
+  - "Hey Siri, LocalBirdReporter longer" to increase the Setting "Show birds from last:" by 1 day
+  - "Hey Siri, LocalBirdReporter shorter" to decrease the Setting "Show birds from last:" by 1 day
+
+  - "Hey Siri, LocalBirdReporter here" to set location to current GPS coordinates and speak a bird report from there
+  - "Hey Siri, LocalBirdReporter <favoriteLocation>" to set the location and speak a bird report from there
+
+Favorite locations are set by tapping the star beside a saved location.  The star is set to yellow to indicate it is a favorite.  Favorites are never removed as new locations are saved; only non-favorite (older) locations get dropped once there are more than 10 of them.
+
+For each favorite saved location there is a tiny circled 'i' on the right.
+If you tap it then you can set a Siri Shortcut Name to make it easier to work with Siri.
+For example, if I have a saved location "Hagerman National Wildlife Refuge" then I can set the Siri shortcut name to "Hagerman".  Now I am able to say "Hey Siri, LocalBirdReporter Hagerman".
 
 
 -----------------------------------------------
@@ -101,6 +125,8 @@ See [SoftwareDesignDocument.md](LocalBirdReporter/SoftwareDesignDocument.md) for
   - Speech synthesis configuration
   - Location-based reset logic
   - Data persistence strategy
+  - App Intents and Siri
+
 
 -----------------------------------------------
 ## Privacy Policy
@@ -111,7 +137,7 @@ All settings and bird tracking are stored locally on your device using UserDefau
 
 **Contact**: stewart.french@gmail.com
 
-**Last Updated**: 08/25/2026
+**Last Updated**: 11/02/2026
 
 ## Support Information
 
@@ -123,7 +149,7 @@ Email: stewart.french@gmail.com
 -----------------------------------------------
 ## Requirements
 
-  - iOS 17.0 or later
+  - iOS 26 or later
   - iPhone (iPad supported but optimized for iPhone)
   - Location Services enabled (with "Always Allow" permission for background operation)
   - Internet connection for eBird API access
@@ -147,7 +173,7 @@ No copyright is claimed on this work. Use it freely without restriction.
 
 ## Acknowledgments
 
-Developed with assistance from Claude Sonnet 4.5 by Anthropic.
+Developed with assistance from Claude Sonnet 5 by Anthropic.
 
 Bird observation data powered by eBird (www.ebird.org), a project of the Cornell Lab of Ornithology.
 

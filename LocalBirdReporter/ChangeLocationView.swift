@@ -34,6 +34,8 @@ struct ChangeLocationView: View
   @State private var showingFullScreenMap = false
   @State private var mapType              : MKMapType = .standard
   @State private var searchCompleter      = LocationSearchCompleter()
+  @State private var editingShortcutFor   : RecentLocation?
+  @State private var shortcutNameInput    = ""
 
   @FocusState private var isSearchFieldFocused : Bool
 
@@ -140,27 +142,67 @@ struct ChangeLocationView: View
           {
             recent in
 
-            Button(
-              action:
-              {
-                selectRecentLocation(recent)
-
-              } // action
-            )
+            HStack
             {
-              HStack
+              Button(
+                action:
+                {
+                  viewModel.toggleFavoriteLocation(recent)
+
+                } // action
+              )
               {
-                Image(systemName: "clock.arrow.circlepath")
-                  .foregroundColor(.secondary)
-                Text(recent.name)
-                  .foregroundColor(.primary)
+                Image(systemName: recent.isFavorite ? "star.fill" : "star")
+                  .foregroundColor(recent.isFavorite ? .yellow : .secondary)
 
-              } // HStack
+              } // Button
+              .buttonStyle(.borderless)
 
-            } // Button
+              Button(
+                action:
+                {
+                  selectRecentLocation(recent)
+
+                } // action
+              )
+              {
+                HStack
+                {
+                  Image(systemName: "clock.arrow.circlepath")
+                    .foregroundColor(.secondary)
+                  Text(recent.name)
+                    .foregroundColor(.primary)
+
+                } // HStack
+
+              } // Button
+              .buttonStyle(.plain)
+
+              if recent.isFavorite
+              {
+                Spacer()
+
+                Button(
+                  action:
+                  {
+                    shortcutNameInput  = recent.siriShortcutName ?? recent.name
+                    editingShortcutFor = recent
+
+                  } // action
+                )
+                {
+                  Image(systemName: "info.circle")
+                    .foregroundColor(.secondary)
+
+                } // Button
+                .buttonStyle(.borderless)
+
+              } // if
+
+            } // HStack
 
           } // List
-          .frame(maxHeight: 150)
+          .frame(maxHeight: 350)
 
         } // if
 
@@ -200,50 +242,29 @@ struct ChangeLocationView: View
 
         } // if
 
-                // Map with tap to expand to full screen
+        Spacer()
 
-        ZStack(alignment: .topTrailing)
-        {
-          TappableMapView(
-            region               : $region,
-            selectedCoordinate   : $selectedCoordinate,
-            mapType              : $mapType,
-            onCoordinateSelected :
-            {
-              coordinate in
+                // View on Map button
 
-              reverseGeocode(coordinate)
-
-            } // onCoordinateSelected
-          )
-          .onTapGesture
+        Button(
+          action:
           {
             showingFullScreenMap = true
 
-          } // onTapGesture
-
-                  // Map type toggle button
-
-          Button(
-            action:
-            {
-              mapType = mapType == .standard ? .hybrid : .standard
-
-            } // action
-          )
+          } // action
+        )
+        {
+          HStack
           {
-            Image(systemName: mapType == .standard ? "map" : "map.fill")
-              .padding(8)
-              .background(Color.white.opacity(0.9))
-              .cornerRadius(8)
-              .shadow(radius: 2)
+            Image(systemName: "map")
+            Text("View on Map")
 
-          } // Button
-          .padding(8)
+          } // HStack
+          .frame(maxWidth: .infinity)
 
-        } // ZStack
-
-        Spacer()
+        } // Button
+        .buttonStyle(.bordered)
+        .padding(.horizontal)
 
                 // Done button
 
@@ -319,6 +340,46 @@ struct ChangeLocationView: View
       )
 
     } // fullScreenCover
+    .alert(
+      "Siri Shortcut Name",
+      isPresented: Binding(
+        get: { editingShortcutFor != nil },
+        set: { if !$0 { editingShortcutFor = nil } }
+      ),
+      presenting: editingShortcutFor
+    )
+    {
+      location in
+
+      TextField(
+        "Shortcut name",
+        text: $shortcutNameInput
+      )
+
+      Button("Save")
+      {
+        viewModel.setSiriShortcutName(
+          shortcutNameInput,
+          for: location
+        )
+
+      } // Button
+
+      Button(
+        "Cancel",
+        role: .cancel
+      )
+      {
+
+      } // Button
+
+    } message:
+    {
+      location in
+
+      Text("Say \"Hey Siri, LocalBirdReporter \(location.siriName)\" to jump to \(location.name).")
+
+    } // alert
 
   } // body
 
@@ -607,98 +668,6 @@ class LocationSearchCompleter: NSObject, MKLocalSearchCompleterDelegate
   } // completer didFailWithError
 
 } // class LocationSearchCompleter
-
-// MARK: - Tappable Map View
-
-// ----------------------------------------
-
-struct TappableMapView: UIViewRepresentable
-{
-  @Binding var region             : MKCoordinateRegion
-  @Binding var selectedCoordinate : CLLocationCoordinate2D?
-  @Binding var mapType            : MKMapType
-  var onCoordinateSelected        : ((CLLocationCoordinate2D) -> Void)?
-
-  // ------------------------------
-
-  func makeUIView(
-    context: Context
-  ) -> MKMapView
-  {
-    let mapView = MKMapView()
-    mapView.delegate = context.coordinator
-    mapView.setRegion(
-      region,
-      animated: false
-    )
-    mapView.mapType         = mapType
-    mapView.isScrollEnabled = false
-    mapView.isZoomEnabled   = false
-    mapView.isRotateEnabled = false
-    mapView.isPitchEnabled  = false
-
-    return mapView
-
-  } // makeUIView
-
-  // ------------------------------
-
-  func updateUIView(
-    _ mapView : MKMapView,
-    context   : Context
-  )
-  {
-    mapView.setRegion(
-      region,
-      animated: true
-    )
-    mapView.mapType = mapType
-
-            // Remove existing annotations
-
-    mapView.removeAnnotations(mapView.annotations)
-
-            // Add pin if coordinate is selected
-
-    if let coordinate = selectedCoordinate
-    {
-      let annotation = MKPointAnnotation()
-      annotation.coordinate = coordinate
-      mapView.addAnnotation(annotation)
-
-    } // if
-
-  } // updateUIView
-
-  // ------------------------------
-
-  func makeCoordinator() -> Coordinator
-  {
-    Coordinator(self)
-
-  } // makeCoordinator
-
-  // ----------------------------------------
-
-  class Coordinator: NSObject, MKMapViewDelegate
-  {
-    var parent: TappableMapView
-
-    // ------------------------------
-
-    init(
-      _ parent: TappableMapView
-    )
-    {
-      self.parent = parent
-
-    } // init
-
-    // Don't update region binding for small map - it's static
-
-  } // class Coordinator
-
-} // struct TappableMapView
 
 // MARK: - Full Screen Map View
 

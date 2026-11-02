@@ -43,13 +43,14 @@ struct BirdObservation: Codable, Identifiable
   } // locationBasedId
 
   // ------------------------------
-  // eBird appends a "(lat, lng)" coordinate pair to locName for personal
-  // (non-hotspot) locations; strip it so coordinates are never spoken
+  // eBird appends a trailing "lat, lng" coordinate pair to locName for
+  // personal (non-hotspot) locations, with or without parentheses;
+  // strip it so coordinates are never spoken
 
   var spokenLocName: String
   {
     guard let range = locName.range(
-      of: #"\s*\(-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?\)\s*$"#,
+      of: #"\s*\(?-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?\)?\s*$"#,
       options: .regularExpression
     )
     else

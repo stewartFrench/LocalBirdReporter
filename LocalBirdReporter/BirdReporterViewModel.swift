@@ -9,6 +9,7 @@ import Foundation
 import CoreLocation
 import AVFoundation
 import UIKit
+import AppIntents
 
 // ----------------------------------------
 
@@ -34,9 +35,11 @@ enum DistanceUnit: String, CaseIterable, Codable
 
 struct RecentLocation: Codable, Identifiable
 {
-  let name      : String
-  let latitude  : Double
-  let longitude : Double
+  let name             : String
+  let latitude         : Double
+  let longitude        : Double
+  var isFavorite       : Bool
+  var siriShortcutName : String?
 
   // ------------------------------
   // Computed property for Identifiable
@@ -58,6 +61,60 @@ struct RecentLocation: Codable, Identifiable
 
   } // coordinate
 
+  // ------------------------------
+  // The name Siri should match against. Falls back to the full name
+  // when no shorter shortcut name has been set
+
+  var siriName: String
+  {
+    siriShortcutName ?? name
+
+  } // siriName
+
+  // ------------------------------
+
+  init(
+    name             : String,
+    latitude         : Double,
+    longitude        : Double,
+    isFavorite       : Bool = false,
+    siriShortcutName : String? = nil
+  )
+  {
+    self.name             = name
+    self.latitude         = latitude
+    self.longitude        = longitude
+    self.isFavorite       = isFavorite
+    self.siriShortcutName = siriShortcutName
+
+  } // init
+
+  // ------------------------------
+  // Custom decoding so entries saved before "isFavorite"/"siriShortcutName"
+  // existed default to false/nil instead of failing to decode
+
+  init(
+    from decoder: Decoder
+  ) throws
+  {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+
+    name             = try container.decode(String.self, forKey: .name)
+    latitude         = try container.decode(Double.self, forKey: .latitude)
+    longitude        = try container.decode(Double.self, forKey: .longitude)
+    isFavorite       = try container.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
+    siriShortcutName = try container.decodeIfPresent(String.self, forKey: .siriShortcutName)
+
+  } // init
+
+  // ------------------------------
+
+  enum CodingKeys: String, CodingKey
+  {
+    case name, latitude, longitude, isFavorite, siriShortcutName
+
+  } // CodingKeys
+
 } // struct RecentLocation
 
 // ----------------------------------------
@@ -65,6 +122,12 @@ struct RecentLocation: Codable, Identifiable
 @Observable
 class BirdReporterViewModel
 {
+
+          // Shared instance so App Intents can act on the same live state
+          // (isSpeaking, settings, birds) as the running app
+
+  static let shared = BirdReporterViewModel()
+
   var locationManager              : LocationManager
   var birds                        : [BirdObservation] = []
   var isLoading                    = false
@@ -400,18 +463,6 @@ class BirdReporterViewModel
     setupSilentAudioPlayer()
     setupNotifications()
 
-    if let savedBirdsData = UserDefaults.standard.data(
-      forKey: "savedBirds"
-    ),
-       let savedBirds = try? JSONDecoder().decode(
-         [BirdObservation].self,
-         from: savedBirdsData
-       )
-    {
-      birds = savedBirds
-
-    } // if
-
             // Clear last known location on app launch
             // This ensures every app launch starts fresh with "First location check"
             // and prevents GPS drift from showing false movement messages
@@ -656,7 +707,6 @@ class BirdReporterViewModel
                       // Clear birds list for fresh start
 
               birds.removeAll()
-              saveBirds()
 
                       // Update last known location ONLY when we reset
 
@@ -778,7 +828,6 @@ class BirdReporterViewModel
 
           birds = Array(combinedBirds.prefix(maxBirdsToDisplay))
 
-          saveBirds()
           saveSeenBirdIds()
 
                   // Speech behavior depends on whether this is an auto-check
@@ -846,7 +895,6 @@ class BirdReporterViewModel
                            "eBird key in Settings."
 
             birds.removeAll()
-            saveBirds()
 
           } // if
           else
@@ -888,7 +936,6 @@ class BirdReporterViewModel
     saveSeenBirdIds()
 
     birds.removeAll()
-    saveBirds()
 
     lastKnownLocation = nil
     UserDefaults.standard.removeObject(forKey: "lastKnownLatitude")
@@ -912,7 +959,6 @@ class BirdReporterViewModel
     saveSeenBirdIds()
 
     birds.removeAll()
-    saveBirds()
 
     lastKnownLocation = nil
     UserDefaults.standard.removeObject(forKey: "lastKnownLatitude")
@@ -929,10 +975,18 @@ class BirdReporterViewModel
     location : CLLocation
   )
   {
+
+            // Preserve favorite status and Siri shortcut name if this
+            // location is already saved
+
+    let existingEntry = recentLocations.first { $0.name == name }
+
     let newLocation = RecentLocation(
-      name      : name,
-      latitude  : location.coordinate.latitude,
-      longitude : location.coordinate.longitude
+      name             : name,
+      latitude         : location.coordinate.latitude,
+      longitude        : location.coordinate.longitude,
+      isFavorite       : existingEntry?.isFavorite ?? false,
+      siriShortcutName : existingEntry?.siriShortcutName
     )
 
             // Remove any existing entry for this name so it moves to the front
@@ -948,13 +1002,78 @@ class BirdReporterViewModel
       at: 0
     )
 
-    if recentLocations.count > 5
-    {
-      recentLocations = Array(recentLocations.prefix(5))
-
-    } // if
+    trimRecentLocations()
 
   } // func addRecentLocation
+
+  // ------------------------------
+  // Flip a saved location's favorite flag. Favorited locations are exempt
+  // from the 10-location cap, so they persist until unchecked
+
+  func toggleFavoriteLocation(
+    _ location: RecentLocation
+  )
+  {
+    guard let index = recentLocations.firstIndex(where: { $0.id == location.id })
+    else
+    {
+      return
+
+    } // guard
+
+    recentLocations[index].isFavorite.toggle()
+
+    trimRecentLocations()
+    LocalBirdReporterShortcuts.updateAppShortcutParameters()
+
+  } // func toggleFavoriteLocation
+
+  // ------------------------------
+  // Set (or clear, if blank) the short name Siri should match for this
+  // saved location. Falls back to the full name when cleared
+
+  func setSiriShortcutName(
+    _ shortcutName : String?,
+    for location   : RecentLocation
+  )
+  {
+    guard let index = recentLocations.firstIndex(where: { $0.id == location.id })
+    else
+    {
+      return
+
+    } // guard
+
+    let trimmedName = shortcutName?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    recentLocations[index].siriShortcutName = (trimmedName?.isEmpty ?? true) ? nil : trimmedName
+
+    LocalBirdReporterShortcuts.updateAppShortcutParameters()
+
+  } // func setSiriShortcutName
+
+  // ------------------------------
+  // Keep at most 10 non-favorite locations; favorites are never evicted
+
+  private func trimRecentLocations()
+  {
+    var nonFavoriteCount = 0
+
+    recentLocations = recentLocations.filter
+    {
+      if $0.isFavorite
+      {
+        return true
+
+      } // if
+
+      nonFavoriteCount += 1
+
+      return nonFavoriteCount <= 10
+
+    } // filter
+
+  } // func trimRecentLocations
 
   // ------------------------------
 
@@ -1173,21 +1292,6 @@ class BirdReporterViewModel
     } // speechEndTask
 
   } // func speakNewBirdsOnly
-
-  // ------------------------------
-
-  private func saveBirds()
-  {
-    if let encoded = try? JSONEncoder().encode(birds)
-    {
-      UserDefaults.standard.set(
-        encoded,
-        forKey: "savedBirds"
-      )
-
-    } // if
-
-  } // func saveBirds
 
   // ------------------------------
 

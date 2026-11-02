@@ -11,7 +11,7 @@ import SwiftUI
 
 struct ContentView: View
 {
-  @State private var viewModel         = BirdReporterViewModel()
+  @State private var viewModel         = BirdReporterViewModel.shared
   @State private var showingSettings   = false
   @State private var showingAbouteBird = false
 
