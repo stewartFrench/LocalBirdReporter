@@ -86,6 +86,25 @@ struct ContentView: View
             16
           )
         } // overlay
+        .overlay(
+          alignment: .leading
+        )
+        {
+          Link(
+            destination: URL(string: "https://github.com/stewartFrench/LocalBirdReporter")!
+          )
+          {
+            Image(
+              systemName: "questionmark.circle"
+            )
+            .font(.title2)
+            .foregroundColor(.blue)
+          } // Link
+          .padding(
+            .leading,
+            16
+          )
+        } // overlay
         .padding(
           .top,
           2
@@ -212,7 +231,7 @@ struct ContentView: View
           )
           .font(.system(size: 60))
           .foregroundColor(.blue)
-          Text("No birds found yet")
+          Text("No birds found")
             .font(.headline)
           Text("Tap the button below to find local birds")
             .font(.caption)

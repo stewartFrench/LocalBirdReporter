@@ -11,10 +11,20 @@ import AVFAudio
 
 // ----------------------------------------
 
-class SpeechService
+class SpeechService: NSObject, AVSpeechSynthesizerDelegate
 {
-  private let synthesizer     : AVSpeechSynthesizer = AVSpeechSynthesizer()
-  var selectedVoiceIdentifier : String?
+  private nonisolated(unsafe) let synthesizer : AVSpeechSynthesizer = AVSpeechSynthesizer()
+  var selectedVoiceIdentifier                 : String?
+  var onSpeechFinished                        : (() -> Void)?
+
+  // ------------------------------
+
+  override init()
+  {
+    super.init()
+    synthesizer.delegate = self
+
+  } // init
 
   // ------------------------------
 
@@ -144,4 +154,41 @@ class SpeechService
   {
     synthesizer.stopSpeaking(at: .immediate)
   } // stopSpeaking
+
+  // ------------------------------
+  // AVSpeechSynthesizerDelegate - the real completion signal, used
+  // instead of guessing how long speech will take
+
+  func speechSynthesizer(
+    _ synthesizer: AVSpeechSynthesizer,
+    didFinish utterance: AVSpeechUtterance
+  )
+  {
+    DispatchQueue.main.async
+    {
+      [weak self] in
+
+      self?.onSpeechFinished?()
+
+    } // async
+
+  } // speechSynthesizer didFinish
+
+  // ------------------------------
+
+  func speechSynthesizer(
+    _ synthesizer: AVSpeechSynthesizer,
+    didCancel utterance: AVSpeechUtterance
+  )
+  {
+    DispatchQueue.main.async
+    {
+      [weak self] in
+
+      self?.onSpeechFinished?()
+
+    } // async
+
+  } // speechSynthesizer didCancel
+
 } // class SpeechService

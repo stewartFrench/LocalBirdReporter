@@ -350,7 +350,6 @@ class BirdReporterViewModel
   private var birdService   : eBirdService
   private var speech        : SpeechService
   private var timer         : Timer?
-  private var speechEndTask : Task<Void, Never>?
   var isAutoCheckEnabled    : Bool = false
   private var audioPlayer   : AVAudioPlayer?
 
@@ -499,6 +498,32 @@ class BirdReporterViewModel
 
     LocalBirdReporterShortcuts.updateAppShortcutParameters()
 
+            // Drive isSpeaking from the synthesizer's real completion
+            // signal instead of a guessed duration, and release the
+            // silent-audio loop once speech genuinely finishes -
+            // unless Auto Check still needs it running
+
+    speech.onSpeechFinished =
+    {
+      [weak self] in
+
+      guard let self
+      else
+      {
+        return
+
+      } // guard
+
+      self.isSpeaking = false
+
+      if !self.isAutoCheckEnabled
+      {
+        self.stopSilentAudio()
+
+      } // if
+
+    } // onSpeechFinished
+
   } // init
 
   // ------------------------------
@@ -578,9 +603,14 @@ class BirdReporterViewModel
 
   func stopSpeaking()
   {
-    speechEndTask?.cancel()
     speech.stopSpeaking()
     isSpeaking = false
+
+    if !isAutoCheckEnabled
+    {
+      stopSilentAudio()
+
+    } // if
 
   } // func stopSpeaking
 
@@ -870,7 +900,23 @@ class BirdReporterViewModel
 
             let birdsToSpeak = newBirdsSorted + unchangedBirdsSorted
 
-            speakBirdsInOrder(Array(birdsToSpeak.prefix(maxBirdsToSpeak)))
+                    // Only announce "No birds found" when eBird genuinely
+                    // returned nothing - not when speech is disabled
+                    // (maxBirdsToSpeak == 0), which must stay silent
+
+            if maxBirdsToSpeak > 0 && birdsToSpeak.isEmpty
+            {
+              isSpeaking = true
+              startSilentAudio()
+
+              speech.speak("No birds found")
+
+            } // if
+            else
+            {
+              speakBirdsInOrder(Array(birdsToSpeak.prefix(maxBirdsToSpeak)))
+
+            } // else
 
           } // else
 
@@ -1178,27 +1224,11 @@ class BirdReporterViewModel
 
     if !speechParts.isEmpty
     {
-      speechEndTask?.cancel()
-
       isSpeaking = true
+      startSilentAudio()
+
       let combinedText = speechParts.joined(separator: ",, ")
       speech.speak(combinedText)
-
-      let estimatedDuration = Double(speechParts.count) * 2.0
-
-      speechEndTask = Task
-      {
-        try? await Task.sleep(
-          nanoseconds: UInt64(estimatedDuration * 1_000_000_000)
-        )
-
-        await MainActor.run
-        {
-          isSpeaking = false
-
-        } // await MainActor.run
-
-      } // speechEndTask
 
     } // if
 
@@ -1228,22 +1258,10 @@ class BirdReporterViewModel
 
       if announceNoNewBirds
       {
-        speechEndTask?.cancel()
-
         isSpeaking = true
+        startSilentAudio()
+
         speech.speak("No new birds")
-
-        speechEndTask = Task
-        {
-          try? await Task.sleep(nanoseconds: 2_000_000_000)
-
-          await MainActor.run
-          {
-            isSpeaking = false
-
-          } // await MainActor.run
-
-        } // speechEndTask
 
       } // if announceNoNewBirds
 
@@ -1276,27 +1294,11 @@ class BirdReporterViewModel
 
     } // for
 
-    speechEndTask?.cancel()
-
     isSpeaking = true
+    startSilentAudio()
+
     let combinedText = speechParts.joined(separator: ",, ")
     speech.speak(combinedText)
-
-    let estimatedDuration = Double(speechParts.count) * 2.0
-
-    speechEndTask = Task
-    {
-      try? await Task.sleep(
-        nanoseconds: UInt64(estimatedDuration * 1_000_000_000)
-      )
-
-      await MainActor.run
-      {
-        isSpeaking = false
-
-      } // await MainActor.run
-
-    } // speechEndTask
 
   } // func speakNewBirdsOnly
 

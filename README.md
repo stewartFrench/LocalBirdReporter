@@ -114,6 +114,8 @@ For each favorite saved location there is a tiny circled 'i' on the right.
 If you tap it then you can set a Siri Shortcut Name to make it easier to work with Siri.
 For example, if I have a saved location "Hagerman National Wildlife Refuge" then I can set the Siri shortcut name to "Hagerman".  Now I am able to say "Hey Siri, LocalBirdReporter Hagerman".
 
+Also, and by the way, you can use the word "BirdReport" instead of "LocalBirdReporter" with Siri and it will work exactly the same.
+
 
 -----------------------------------------------
 ## Documentation

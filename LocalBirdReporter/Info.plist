@@ -7,5 +7,12 @@
 		<string>audio</string>
 		<string>location</string>
 	</array>
+	<key>INAlternativeAppNames</key>
+	<array>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>BirdReport</string>
+		</dict>
+	</array>
 </dict>
 </plist>
