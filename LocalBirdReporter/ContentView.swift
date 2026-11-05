@@ -91,7 +91,10 @@ struct ContentView: View
         )
         {
           Link(
-            destination: URL(string: "https://github.com/stewartFrench/LocalBirdReporter")!
+            destination: URL(
+              string: "https://github.com/stewartFrench/LocalBirdReporter/" +
+                      "blob/main/README.md"
+            )!
           )
           {
             Image(

@@ -19,12 +19,13 @@ Some observations are so exciting you'll want to pull over and try to spot them 
 
    - Visit <https://ebird.org/api/keygen>
    - Request a free eBird key.  This requires an eBird account.  An account does not cost anything and gives you access to all the Cornell Lab of Ornithology projects.
-   - Copy your eBird key
+   - Carefully copy your eBird key
 
 2. **Configure the App**
 
-   - Open Settings in the app
-   - Paste in your eBird key from Step 1
+   - Open Settings in the app by tapping the Settings icon in the upper right
+   - Scroll down near the bottom where you will see "eBird Key"
+   - Paste in your eBird key from Step 1 and tap Done
 
    - Adjust settings to your preference, or just take the defaults and see what happens!
 
